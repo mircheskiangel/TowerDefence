@@ -1,8 +1,12 @@
 using System.IO;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace TowerDefense.EditorTools
 {
@@ -20,6 +24,7 @@ namespace TowerDefense.EditorTools
         private const string DataFolder = GeneratedFolder + "/Data";
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
+        private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
 
         // --- Level layout ---
         private const int GridWidth = 16;
@@ -34,12 +39,14 @@ namespace TowerDefense.EditorTools
         private static readonly Color TileColorB = new Color(0.27f, 0.40f, 0.27f);
         private static readonly Color SpawnColor = new Color(0.20f, 0.55f, 1.00f);
         private static readonly Color GoalColor = new Color(0.95f, 0.30f, 0.25f);
+        private static readonly Color BasicTowerColor = new Color(0.30f, 0.75f, 0.95f);
 
         // --- Sorting orders (higher draws on top) ---
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
-        public const int OrderObstacles = 2;
+        public const int OrderTowers = 5;
         public const int OrderEnemies = 10;
+        public const int OrderHighlight = 15;
         public const int OrderPathLine = 20;
 
         private const int SpritePixels = 32;
@@ -48,6 +55,8 @@ namespace TowerDefense.EditorTools
         public static void BuildLevel()
         {
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+            if (!EnsureTextMeshProResources())
                 return;
 
             EnsureFolder(GeneratedFolder);
@@ -65,6 +74,8 @@ namespace TowerDefense.EditorTools
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 15,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
             CreateEnemyPrefab(circle, spriteMaterial);
+            TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f, BasicTowerColor);
+            CreateTowerPrefab(square, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -80,16 +91,23 @@ namespace TowerDefense.EditorTools
             // 4. Camera
             BuildCamera(grid);
 
-            // 5. Pathfinding debug (path line + temporary test walls)
-            BuildPathDebug(grid, square, spriteMaterial);
+            // 5. Pathfinding debug (path line, P toggles)
+            BuildPathDebug(grid, spriteMaterial);
 
-            // 6. Temporary enemy spawner (replaced by WaveManager in M5).
             // Prefabs are re-loaded here: opening a new scene can unload assets created before it,
             // which would leave a dead reference and an empty field in the saved scene.
             Enemy enemyPrefab = AssetDatabase.LoadAssetAtPath<Enemy>(EnemyPrefabPath);
+            Tower towerPrefab = AssetDatabase.LoadAssetAtPath<Tower>(TowerPrefabPath);
+
+            // 6. Temporary enemy spawner (replaced by WaveManager in M5).
             BuildTestSpawner(grid, enemyPrefab, grunt, tank);
 
-            // 7. Save and register in Build Settings
+            // 7. Player resources, tower placement and UI
+            PlayerResources resources = BuildPlayerResources();
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, spriteMaterial);
+            BuildUI(resources);
+
+            // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -144,21 +162,75 @@ namespace TowerDefense.EditorTools
             fitter.Fit();
         }
 
-        private static void BuildPathDebug(GridManager grid, Sprite square, Material material)
+        private static void BuildPathDebug(GridManager grid, Material material)
         {
             GameObject debugGo = new GameObject("PathDebug");
             PathDebugView view = debugGo.AddComponent<PathDebugView>();
             SetField(view, "grid", grid);
             SetField(view, "lineMaterial", material);
             SetField(view, "sortingOrder", OrderPathLine);
+        }
 
-            // TEMPORARY: remove once towers can block cells.
-            GameObject testGo = new GameObject("PathTestObstacles");
-            PathTestObstacles test = testGo.AddComponent<PathTestObstacles>();
-            SetField(test, "grid", grid);
-            SetField(test, "blockSprite", square);
-            SetField(test, "blockMaterial", material);
-            SetField(test, "sortingOrder", OrderObstacles);
+        private static PlayerResources BuildPlayerResources()
+        {
+            GameObject go = new GameObject("PlayerResources");
+            return go.AddComponent<PlayerResources>();
+        }
+
+        private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
+            TowerSO towerData, Sprite square, Material material)
+        {
+            GameObject go = new GameObject("TowerPlacer");
+            TowerPlacer placer = go.AddComponent<TowerPlacer>();
+
+            GameObject highlight = CreateSpriteObject("HoverHighlight", square, material, new Color(1f, 1f, 1f, 0.45f), OrderHighlight);
+            highlight.transform.SetParent(go.transform, false);
+            SpriteRenderer highlightRenderer = highlight.GetComponent<SpriteRenderer>();
+            highlightRenderer.enabled = false;
+
+            SetField(placer, "grid", grid);
+            SetField(placer, "resources", resources);
+            SetField(placer, "cam", Camera.main);
+            SetField(placer, "towerPrefab", towerPrefab);
+            SetField(placer, "towerData", towerData);
+            SetField(placer, "highlight", highlightRenderer);
+        }
+
+        // Screen-space canvas with the HUD label, plus an EventSystem that uses the
+        // new Input System (needed so TowerPlacer can ignore clicks on UI).
+        private static void BuildUI(PlayerResources resources)
+        {
+            GameObject canvasGo = new GameObject("Canvas");
+            Canvas canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasGo.AddComponent<GraphicRaycaster>();
+
+            GameObject labelGo = new GameObject("ResourcesLabel", typeof(RectTransform));
+            labelGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform rect = labelGo.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(24f, -16f);
+            rect.sizeDelta = new Vector2(700f, 60f);
+
+            TextMeshProUGUI label = labelGo.AddComponent<TextMeshProUGUI>();
+            label.text = "Gold: 0  Lives: 0";
+            label.fontSize = 36;
+            label.color = Color.white;
+            label.alignment = TextAlignmentOptions.TopLeft;
+            label.raycastTarget = false; // A label should never swallow clicks meant for the grid.
+
+            ResourcesHUD hud = labelGo.AddComponent<ResourcesHUD>();
+            SetField(hud, "resources", resources);
+            SetField(hud, "label", label);
+
+            GameObject eventSystemGo = new GameObject("EventSystem");
+            eventSystemGo.AddComponent<EventSystem>();
+            eventSystemGo.AddComponent<InputSystemUIInputModule>();
         }
 
         private static void BuildTestSpawner(GridManager grid, Enemy enemyPrefab, EnemySO grunt, EnemySO tank)
@@ -275,6 +347,50 @@ namespace TowerDefense.EditorTools
 
             PrefabUtility.SaveAsPrefabAsset(go, EnemyPrefabPath); // Overwrites, keeps GUID.
             Object.DestroyImmediate(go);
+        }
+
+        // Creates the TowerSO asset, or updates it in place (same GUID) if it already exists.
+        private static TowerSO CreateTowerData(string name, int cost, float range, float damage, float fireRate, Color color)
+        {
+            string path = $"{DataFolder}/{name.Replace(" ", "")}.asset";
+            TowerSO data = AssetDatabase.LoadAssetAtPath<TowerSO>(path);
+            if (data == null)
+            {
+                data = ScriptableObject.CreateInstance<TowerSO>();
+                AssetDatabase.CreateAsset(data, path);
+            }
+            data.displayName = name;
+            data.cost = cost;
+            data.range = range;
+            data.damage = damage;
+            data.fireRate = fireRate;
+            data.color = color;
+            EditorUtility.SetDirty(data);
+            return data;
+        }
+
+        // One generic tower prefab (white square, slightly smaller than a cell); colored from TowerSO.
+        private static void CreateTowerPrefab(Sprite square, Material material)
+        {
+            GameObject go = CreateSpriteObject("Tower", square, material, Color.white, OrderTowers);
+            go.transform.localScale = Vector3.one * CellSize * 0.8f;
+            Tower tower = go.AddComponent<Tower>();
+            SetField(tower, "body", go.GetComponent<SpriteRenderer>());
+
+            PrefabUtility.SaveAsPrefabAsset(go, TowerPrefabPath);
+            Object.DestroyImmediate(go);
+        }
+
+        // TextMeshPro needs its "Essential Resources" (default font + settings) inside Assets/.
+        // If they are missing, import them and ask the user to run the builder again,
+        // because the package import finishes asynchronously.
+        private static bool EnsureTextMeshProResources()
+        {
+            if (AssetDatabase.FindAssets("t:TMP_Settings").Length > 0) return true;
+            TMP_PackageResourceImporter.ImportResources(true, false, false);
+            Debug.LogWarning("[LevelBuilder] Imported TextMesh Pro Essential Resources. " +
+                             "Run 'Tower Defense/Build Level' again once the import has finished.");
+            return false;
         }
 
         // Unlit sprite material so the level needs no 2D lights to be visible.
