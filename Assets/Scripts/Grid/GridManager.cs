@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace TowerDefense
@@ -85,6 +86,20 @@ namespace TowerDefense
             if (blocked[cell.x, cell.y] == value) return;
             blocked[cell.x, cell.y] = value;
             GridChanged?.Invoke();
+        }
+
+        // Changes many cells at once and raises GridChanged only one time.
+        public void SetBlocked(IEnumerable<Vector2Int> cells, bool value)
+        {
+            EnsureArray();
+            bool changed = false;
+            foreach (Vector2Int cell in cells)
+            {
+                if (!IsInBounds(cell) || blocked[cell.x, cell.y] == value) continue;
+                blocked[cell.x, cell.y] = value;
+                changed = true;
+            }
+            if (changed) GridChanged?.Invoke();
         }
 
         // Center of a cell in world space.

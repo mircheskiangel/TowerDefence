@@ -35,6 +35,8 @@ namespace TowerDefense.EditorTools
         // --- Sorting orders (higher draws on top) ---
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
+        public const int OrderObstacles = 2;
+        public const int OrderPathLine = 20;
 
         private const int SpritePixels = 32;
 
@@ -67,7 +69,10 @@ namespace TowerDefense.EditorTools
             // 4. Camera
             BuildCamera(grid);
 
-            // 5. Save and register in Build Settings
+            // 5. Pathfinding debug (path line + temporary test walls)
+            BuildPathDebug(grid, square, spriteMaterial);
+
+            // 6. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -120,6 +125,46 @@ namespace TowerDefense.EditorTools
             CameraFitter fitter = camGo.AddComponent<CameraFitter>();
             fitter.SetGrid(grid);
             fitter.Fit();
+        }
+
+        private static void BuildPathDebug(GridManager grid, Sprite square, Material material)
+        {
+            GameObject debugGo = new GameObject("PathDebug");
+            PathDebugView view = debugGo.AddComponent<PathDebugView>();
+            SetField(view, "grid", grid);
+            SetField(view, "lineMaterial", material);
+            SetField(view, "sortingOrder", OrderPathLine);
+
+            // TEMPORARY: remove once towers can block cells.
+            GameObject testGo = new GameObject("PathTestObstacles");
+            PathTestObstacles test = testGo.AddComponent<PathTestObstacles>();
+            SetField(test, "grid", grid);
+            SetField(test, "blockSprite", square);
+            SetField(test, "blockMaterial", material);
+            SetField(test, "sortingOrder", OrderObstacles);
+        }
+
+        // Assigns a [SerializeField] (private) field through Unity's serialization,
+        // so the value is saved with the scene.
+        private static void SetField(Object target, string fieldName, object value)
+        {
+            SerializedObject so = new SerializedObject(target);
+            SerializedProperty prop = so.FindProperty(fieldName);
+            if (prop == null)
+            {
+                Debug.LogError($"[LevelBuilder] Field '{fieldName}' not found on {target.GetType().Name}");
+                return;
+            }
+            switch (value)
+            {
+                case Object obj: prop.objectReferenceValue = obj; break;
+                case int i: prop.intValue = i; break;
+                case float f: prop.floatValue = f; break;
+                case bool b: prop.boolValue = b; break;
+                case Color c: prop.colorValue = c; break;
+                default: Debug.LogError($"[LevelBuilder] Unsupported type for '{fieldName}'"); break;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static GameObject CreateSpriteObject(string name, Sprite sprite, Material material, Color color, int order)
