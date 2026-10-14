@@ -19,6 +19,7 @@ namespace TowerDefense.EditorTools
         private const string MaterialsFolder = GeneratedFolder + "/Materials";
         private const string DataFolder = GeneratedFolder + "/Data";
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
+        private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
 
         // --- Level layout ---
         private const int GridWidth = 16;
@@ -63,7 +64,7 @@ namespace TowerDefense.EditorTools
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 15,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
-            Enemy enemyPrefab = CreateEnemyPrefab(circle, spriteMaterial);
+            CreateEnemyPrefab(circle, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -82,7 +83,10 @@ namespace TowerDefense.EditorTools
             // 5. Pathfinding debug (path line + temporary test walls)
             BuildPathDebug(grid, square, spriteMaterial);
 
-            // 6. Temporary enemy spawner (replaced by WaveManager in M5)
+            // 6. Temporary enemy spawner (replaced by WaveManager in M5).
+            // Prefabs are re-loaded here: opening a new scene can unload assets created before it,
+            // which would leave a dead reference and an empty field in the saved scene.
+            Enemy enemyPrefab = AssetDatabase.LoadAssetAtPath<Enemy>(EnemyPrefabPath);
             BuildTestSpawner(grid, enemyPrefab, grunt, tank);
 
             // 7. Save and register in Build Settings
@@ -171,6 +175,8 @@ namespace TowerDefense.EditorTools
         // so the value is saved with the scene.
         private static void SetField(Object target, string fieldName, object value)
         {
+            if (value is Object unityObj && unityObj == null)
+                Debug.LogError($"[LevelBuilder] Assigning a missing object to '{fieldName}' on {target.GetType().Name}");
             SerializedObject so = new SerializedObject(target);
             SerializedProperty prop = so.FindProperty(fieldName);
             if (prop == null)
@@ -261,16 +267,14 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
-        private static Enemy CreateEnemyPrefab(Sprite circle, Material material)
+        private static void CreateEnemyPrefab(Sprite circle, Material material)
         {
-            string path = $"{PrefabsFolder}/Enemy.prefab";
             GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
             Enemy enemy = go.AddComponent<Enemy>();
             SetField(enemy, "body", go.GetComponent<SpriteRenderer>());
 
-            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path); // Overwrites, keeps GUID.
+            PrefabUtility.SaveAsPrefabAsset(go, EnemyPrefabPath); // Overwrites, keeps GUID.
             Object.DestroyImmediate(go);
-            return prefab.GetComponent<Enemy>();
         }
 
         // Unlit sprite material so the level needs no 2D lights to be visible.
