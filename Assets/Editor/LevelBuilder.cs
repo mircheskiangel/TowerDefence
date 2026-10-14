@@ -40,16 +40,20 @@ namespace TowerDefense.EditorTools
         private static readonly Color SpawnColor = new Color(0.20f, 0.55f, 1.00f);
         private static readonly Color GoalColor = new Color(0.95f, 0.30f, 0.25f);
         private static readonly Color BasicTowerColor = new Color(0.30f, 0.75f, 0.95f);
+        private static readonly Color RangeColor = new Color(0.55f, 0.85f, 1.00f, 0.9f);
+        private static readonly Color MessageColor = new Color(1.00f, 0.35f, 0.30f);
 
         // --- Sorting orders (higher draws on top) ---
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
+        public const int OrderRange = 3;
         public const int OrderTowers = 5;
         public const int OrderEnemies = 10;
         public const int OrderHighlight = 15;
         public const int OrderPathLine = 20;
 
         private const int SpritePixels = 32;
+        private const int RingPixels = 128; // Higher resolution: the range ring is scaled up to ~5 cells.
 
         [MenuItem("Tower Defense/Build Level")]
         public static void BuildLevel()
@@ -68,6 +72,7 @@ namespace TowerDefense.EditorTools
             // 1. Assets
             Sprite square = CreateSprite("Square", SpriteShape.Square);
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
+            Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 30f, moveSpeed: 2f, goldReward: 5,
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
@@ -104,8 +109,9 @@ namespace TowerDefense.EditorTools
 
             // 7. Player resources, tower placement and UI
             PlayerResources resources = BuildPlayerResources();
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, spriteMaterial);
-            BuildUI(resources);
+            MessageDisplay messages = BuildUI(resources);
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages);
+            BuildDebugKeys(resources); // TEMPORARY
 
             // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
@@ -178,7 +184,7 @@ namespace TowerDefense.EditorTools
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
-            TowerSO towerData, Sprite square, Material material)
+            TowerSO towerData, Sprite square, Sprite ring, Material material, MessageDisplay messages)
         {
             GameObject go = new GameObject("TowerPlacer");
             TowerPlacer placer = go.AddComponent<TowerPlacer>();
@@ -188,17 +194,32 @@ namespace TowerDefense.EditorTools
             SpriteRenderer highlightRenderer = highlight.GetComponent<SpriteRenderer>();
             highlightRenderer.enabled = false;
 
+            GameObject range = CreateSpriteObject("RangeCircle", ring, material, RangeColor, OrderRange);
+            range.transform.SetParent(go.transform, false);
+            SpriteRenderer rangeRenderer = range.GetComponent<SpriteRenderer>();
+            rangeRenderer.enabled = false;
+
             SetField(placer, "grid", grid);
             SetField(placer, "resources", resources);
             SetField(placer, "cam", Camera.main);
             SetField(placer, "towerPrefab", towerPrefab);
             SetField(placer, "towerData", towerData);
             SetField(placer, "highlight", highlightRenderer);
+            SetField(placer, "rangeCircle", rangeRenderer);
+            SetField(placer, "messages", messages);
+        }
+
+        // TEMPORARY debug shortcuts (G = +100 gold). Remove this call and DebugKeys.cs to drop them.
+        private static void BuildDebugKeys(PlayerResources resources)
+        {
+            GameObject go = new GameObject("DebugKeys");
+            DebugKeys keys = go.AddComponent<DebugKeys>();
+            SetField(keys, "resources", resources);
         }
 
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
-        private static void BuildUI(PlayerResources resources)
+        private static MessageDisplay BuildUI(PlayerResources resources)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -228,9 +249,31 @@ namespace TowerDefense.EditorTools
             SetField(hud, "resources", resources);
             SetField(hud, "label", label);
 
+            // Centered message near the top ("Path blocked!"), invisible until shown.
+            GameObject messageGo = new GameObject("MessageLabel", typeof(RectTransform));
+            messageGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform messageRect = messageGo.GetComponent<RectTransform>();
+            messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 1f);
+            messageRect.pivot = new Vector2(0.5f, 1f);
+            messageRect.anchoredPosition = new Vector2(0f, -80f);
+            messageRect.sizeDelta = new Vector2(900f, 80f);
+
+            TextMeshProUGUI messageLabel = messageGo.AddComponent<TextMeshProUGUI>();
+            messageLabel.text = "";
+            messageLabel.fontSize = 56;
+            messageLabel.fontStyle = FontStyles.Bold;
+            messageLabel.color = MessageColor;
+            messageLabel.alignment = TextAlignmentOptions.Center;
+            messageLabel.raycastTarget = false;
+            messageLabel.alpha = 0f;
+
+            MessageDisplay messages = messageGo.AddComponent<MessageDisplay>();
+            SetField(messages, "label", messageLabel);
+
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
             eventSystemGo.AddComponent<InputSystemUIInputModule>();
+            return messages;
         }
 
         private static void BuildTestSpawner(GridManager grid, Enemy enemyPrefab, EnemySO grunt, EnemySO tank)
@@ -281,23 +324,32 @@ namespace TowerDefense.EditorTools
 
         // --------------------------------------------------------------- Assets
 
-        private enum SpriteShape { Square, Circle }
+        private enum SpriteShape { Square, Circle, Ring }
 
         // Generates a white PNG (tinted later via SpriteRenderer.color) and imports it as a sprite
-        // where SpritePixels pixels = 1 world unit.
-        private static Sprite CreateSprite(string name, SpriteShape shape)
+        // that is exactly 1 world unit wide (pixels per unit = texture size).
+        // Ring = faint filled disc with a solid outline, used for the tower range display.
+        private static Sprite CreateSprite(string name, SpriteShape shape, int size = SpritePixels)
         {
             string path = $"{SpritesFolder}/{name}.png";
 
-            Texture2D tex = new Texture2D(SpritePixels, SpritePixels, TextureFormat.RGBA32, false);
-            Vector2 center = new Vector2((SpritePixels - 1) * 0.5f, (SpritePixels - 1) * 0.5f);
-            float radius = SpritePixels * 0.5f;
-            for (int x = 0; x < SpritePixels; x++)
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+            float radius = size * 0.5f - 0.5f;
+            float ringWidth = size * 0.025f;
+            for (int x = 0; x < size; x++)
             {
-                for (int y = 0; y < SpritePixels; y++)
+                for (int y = 0; y < size; y++)
                 {
-                    bool filled = shape == SpriteShape.Square || Vector2.Distance(new Vector2(x, y), center) <= radius - 0.5f;
-                    tex.SetPixel(x, y, filled ? Color.white : Color.clear);
+                    float d = Vector2.Distance(new Vector2(x, y), center);
+                    float alpha;
+                    switch (shape)
+                    {
+                        case SpriteShape.Square: alpha = 1f; break;
+                        case SpriteShape.Circle: alpha = d <= radius ? 1f : 0f; break;
+                        default: alpha = d > radius ? 0f : (d >= radius - ringWidth ? 1f : 0.12f); break;
+                    }
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                 }
             }
             tex.Apply();
@@ -308,7 +360,7 @@ namespace TowerDefense.EditorTools
             TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = SpritePixels;
+            importer.spritePixelsPerUnit = size;
             importer.filterMode = shape == SpriteShape.Square ? FilterMode.Point : FilterMode.Bilinear;
             importer.alphaIsTransparency = true;
             importer.mipmapEnabled = false;

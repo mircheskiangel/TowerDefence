@@ -8,6 +8,17 @@ namespace TowerDefense
     // so it reacts to new obstacles mid-walk without teleporting.
     public class Enemy : MonoBehaviour
     {
+        // Every enemy currently alive in the level (used by tower placement checks and, later, targeting).
+        private static readonly List<Enemy> active = new List<Enemy>();
+        public static IReadOnlyList<Enemy> Active => active;
+
+        // Clears the list when Play mode starts (needed if domain reload is disabled in the editor).
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            active.Clear();
+        }
+
         [SerializeField] private SpriteRenderer body;
 
         private EnemySO data;
@@ -54,6 +65,7 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
 
+            if (!active.Contains(this)) active.Add(this);
             Subscribe();
             Repath();
         }
@@ -72,6 +84,7 @@ namespace TowerDefense
         private void OnDestroy()
         {
             Unsubscribe();
+            active.Remove(this);
         }
 
         private void Subscribe()
@@ -89,6 +102,8 @@ namespace TowerDefense
         }
 
         // Recomputes the path from the cell we occupy now to the goal.
+        // The current cell may itself be blocked (a tower was just built on top of us):
+        // A* always treats the start cell as walkable, so we simply walk out of it.
         // To avoid snapping backwards: if we are already part-way along the step from
         // that cell towards the new path's next cell, we keep walking forwards to it;
         // otherwise we first walk back to our cell's center (at most half a cell).
@@ -165,6 +180,7 @@ namespace TowerDefense
         {
             IsDead = true;
             Unsubscribe();
+            active.Remove(this);
             Destroy(gameObject);
         }
 
@@ -173,6 +189,7 @@ namespace TowerDefense
             Debug.Log($"[Enemy] {name} reached goal");
             IsDead = true;
             Unsubscribe();
+            active.Remove(this);
             Destroy(gameObject);
         }
     }

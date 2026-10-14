@@ -53,7 +53,8 @@ namespace TowerDefense
         }
 
         // Returns the cells from start to goal (both inclusive), or null if no path exists.
-        // The start cell itself is allowed to be blocked (e.g. an enemy standing where a tower appears).
+        // The start cell is ALWAYS treated as walkable, even if blocked (e.g. an enemy standing
+        // where a tower was just built): it is never checked, only its neighbours are.
         public List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
         {
             LastExpandedCount = 0;

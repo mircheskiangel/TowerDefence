@@ -88,6 +88,16 @@ namespace TowerDefense
             GridChanged?.Invoke();
         }
 
+        // Changes a cell WITHOUT raising GridChanged. Only for "what if" simulations
+        // (e.g. TowerPlacer testing whether a tower would block the path): the caller
+        // must restore the original value afterwards, so nobody else ever sees the change.
+        public void SetBlockedSilently(Vector2Int cell, bool value)
+        {
+            if (!IsInBounds(cell)) return;
+            EnsureArray();
+            blocked[cell.x, cell.y] = value;
+        }
+
         // Changes many cells at once and raises GridChanged only one time.
         public void SetBlocked(IEnumerable<Vector2Int> cells, bool value)
         {
