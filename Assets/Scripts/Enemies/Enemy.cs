@@ -8,17 +8,6 @@ namespace TowerDefense
     // so it reacts to new obstacles mid-walk without teleporting.
     public class Enemy : MonoBehaviour
     {
-        // Every enemy currently alive in the level (used by tower placement checks and, later, targeting).
-        private static readonly List<Enemy> active = new List<Enemy>();
-        public static IReadOnlyList<Enemy> Active => active;
-
-        // Clears the list when Play mode starts (needed if domain reload is disabled in the editor).
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics()
-        {
-            active.Clear();
-        }
-
         [SerializeField] private SpriteRenderer body;
 
         private EnemySO data;
@@ -32,14 +21,20 @@ namespace TowerDefense
 
         public EnemySO Data => data;
         public float CurrentHealth { get; private set; }
+        public float MaxHealth => data != null ? data.maxHealth : 0f;
         public bool IsDead { get; private set; }
         public bool IsWaiting => !hasRoute;
 
         // The cell whose square contains the enemy right now.
         public Vector2Int CurrentCell => grid != null ? grid.WorldToCell(transform.position) : Vector2Int.zero;
 
-        // Total distance walked since spawning, in cells.
-        public float PathProgress { get; private set; }
+        // How far along its route the enemy is: higher = closer to the goal (0 = at the goal).
+        // Defined as minus the remaining path length, NOT as distance walked, because after a
+        // re-path an enemy that took a long detour may have walked more but still be further away.
+        public float PathProgress => -RemainingDistance;
+
+        // Total distance walked since spawning, in cells (for stats/debugging).
+        public float DistanceWalked { get; private set; }
 
         // Distance left to the goal along the current path, in cells (used by "First" targeting).
         public float RemainingDistance
@@ -65,26 +60,26 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
 
-            if (!active.Contains(this)) active.Add(this);
             Subscribe();
             Repath();
         }
 
         private void OnEnable()
         {
+            EnemyRegistry.Register(this);
             // Re-subscribe if the object was disabled and enabled again after Initialize.
             if (grid != null) Subscribe();
         }
 
         private void OnDisable()
         {
+            EnemyRegistry.Unregister(this);
             Unsubscribe();
         }
 
         private void OnDestroy()
         {
             Unsubscribe();
-            active.Remove(this);
         }
 
         private void Subscribe()
@@ -162,7 +157,7 @@ namespace TowerDefense
             Vector3 target = grid.CellToWorld(path[targetIndex]);
             float step = data.moveSpeed * grid.CellSize * Time.deltaTime;
             Vector3 newPosition = Vector3.MoveTowards(transform.position, target, step);
-            PathProgress += Vector3.Distance(transform.position, newPosition) / grid.CellSize;
+            DistanceWalked += Vector3.Distance(transform.position, newPosition) / grid.CellSize;
             transform.position = newPosition;
 
             if ((newPosition - target).sqrMagnitude < 0.000001f)
@@ -180,7 +175,6 @@ namespace TowerDefense
         {
             IsDead = true;
             Unsubscribe();
-            active.Remove(this);
             Destroy(gameObject);
         }
 
@@ -189,7 +183,6 @@ namespace TowerDefense
             Debug.Log($"[Enemy] {name} reached goal");
             IsDead = true;
             Unsubscribe();
-            active.Remove(this);
             Destroy(gameObject);
         }
     }

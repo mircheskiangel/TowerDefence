@@ -112,6 +112,7 @@ namespace TowerDefense.EditorTools
             MessageDisplay messages = BuildUI(resources);
             BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages);
             BuildDebugKeys(resources); // TEMPORARY
+            new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
 
             // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
@@ -248,6 +249,25 @@ namespace TowerDefense.EditorTools
             ResourcesHUD hud = labelGo.AddComponent<ResourcesHUD>();
             SetField(hud, "resources", resources);
             SetField(hud, "label", label);
+
+            // Second label under it: current targeting mode.
+            GameObject targetingGo = new GameObject("TargetingLabel", typeof(RectTransform));
+            targetingGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform targetingRect = targetingGo.GetComponent<RectTransform>();
+            targetingRect.anchorMin = targetingRect.anchorMax = new Vector2(0f, 1f);
+            targetingRect.pivot = new Vector2(0f, 1f);
+            targetingRect.anchoredPosition = new Vector2(24f, -64f);
+            targetingRect.sizeDelta = new Vector2(700f, 50f);
+
+            TextMeshProUGUI targetingLabel = targetingGo.AddComponent<TextMeshProUGUI>();
+            targetingLabel.text = "Targeting: First (T to change)";
+            targetingLabel.fontSize = 30;
+            targetingLabel.color = new Color(0.85f, 0.9f, 1f);
+            targetingLabel.alignment = TextAlignmentOptions.TopLeft;
+            targetingLabel.raycastTarget = false;
+
+            TargetingHUD targetingHud = targetingGo.AddComponent<TargetingHUD>();
+            SetField(targetingHud, "label", targetingLabel);
 
             // Centered message near the top ("Path blocked!"), invisible until shown.
             GameObject messageGo = new GameObject("MessageLabel", typeof(RectTransform));
@@ -428,6 +448,7 @@ namespace TowerDefense.EditorTools
             go.transform.localScale = Vector3.one * CellSize * 0.8f;
             Tower tower = go.AddComponent<Tower>();
             SetField(tower, "body", go.GetComponent<SpriteRenderer>());
+            SetField(tower, "lineMaterial", material);
 
             PrefabUtility.SaveAsPrefabAsset(go, TowerPrefabPath);
             Object.DestroyImmediate(go);

@@ -137,7 +137,7 @@ namespace TowerDefense
                 if (pathfinder.FindPath(grid.SpawnCell, grid.GoalCell) == null)
                     return false;
 
-                foreach (Enemy enemy in Enemy.Active)
+                foreach (Enemy enemy in EnemyRegistry.Active)
                 {
                     // Enemies that are already waiting had no route before this tower, so they don't count.
                     if (enemy == null || enemy.IsDead || enemy.IsWaiting) continue;
