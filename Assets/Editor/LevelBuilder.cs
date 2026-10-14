@@ -17,6 +17,8 @@ namespace TowerDefense.EditorTools
         private const string GeneratedFolder = "Assets/Generated";
         private const string SpritesFolder = GeneratedFolder + "/Sprites";
         private const string MaterialsFolder = GeneratedFolder + "/Materials";
+        private const string DataFolder = GeneratedFolder + "/Data";
+        private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
 
         // --- Level layout ---
         private const int GridWidth = 16;
@@ -36,6 +38,7 @@ namespace TowerDefense.EditorTools
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
         public const int OrderObstacles = 2;
+        public const int OrderEnemies = 10;
         public const int OrderPathLine = 20;
 
         private const int SpritePixels = 32;
@@ -49,11 +52,18 @@ namespace TowerDefense.EditorTools
             EnsureFolder(GeneratedFolder);
             EnsureFolder(SpritesFolder);
             EnsureFolder(MaterialsFolder);
+            EnsureFolder(DataFolder);
+            EnsureFolder(PrefabsFolder);
 
             // 1. Assets
             Sprite square = CreateSprite("Square", SpriteShape.Square);
-            CreateSprite("Circle", SpriteShape.Circle);
+            Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Material spriteMaterial = CreateSpriteMaterial();
+            EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 30f, moveSpeed: 2f, goldReward: 5,
+                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
+            EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 15,
+                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
+            Enemy enemyPrefab = CreateEnemyPrefab(circle, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -72,7 +82,10 @@ namespace TowerDefense.EditorTools
             // 5. Pathfinding debug (path line + temporary test walls)
             BuildPathDebug(grid, square, spriteMaterial);
 
-            // 6. Save and register in Build Settings
+            // 6. Temporary enemy spawner (replaced by WaveManager in M5)
+            BuildTestSpawner(grid, enemyPrefab, grunt, tank);
+
+            // 7. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -142,6 +155,16 @@ namespace TowerDefense.EditorTools
             SetField(test, "blockSprite", square);
             SetField(test, "blockMaterial", material);
             SetField(test, "sortingOrder", OrderObstacles);
+        }
+
+        private static void BuildTestSpawner(GridManager grid, Enemy enemyPrefab, EnemySO grunt, EnemySO tank)
+        {
+            GameObject go = new GameObject("TestSpawner");
+            TestSpawner spawner = go.AddComponent<TestSpawner>();
+            SetField(spawner, "grid", grid);
+            SetField(spawner, "enemyPrefab", enemyPrefab);
+            SetField(spawner, "gruntData", grunt);
+            SetField(spawner, "tankData", tank);
         }
 
         // Assigns a [SerializeField] (private) field through Unity's serialization,
@@ -215,6 +238,39 @@ namespace TowerDefense.EditorTools
             importer.SaveAndReimport();
 
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        // Creates the EnemySO asset, or updates it in place (same GUID) if it already exists.
+        private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale)
+        {
+            string path = $"{DataFolder}/{name}.asset";
+            EnemySO data = AssetDatabase.LoadAssetAtPath<EnemySO>(path);
+            if (data == null)
+            {
+                data = ScriptableObject.CreateInstance<EnemySO>();
+                AssetDatabase.CreateAsset(data, path);
+            }
+            data.displayName = name;
+            data.maxHealth = maxHealth;
+            data.moveSpeed = moveSpeed;
+            data.goldReward = goldReward;
+            data.color = color;
+            data.scale = scale;
+            EditorUtility.SetDirty(data);
+            return data;
+        }
+
+        // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
+        private static Enemy CreateEnemyPrefab(Sprite circle, Material material)
+        {
+            string path = $"{PrefabsFolder}/Enemy.prefab";
+            GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
+            Enemy enemy = go.AddComponent<Enemy>();
+            SetField(enemy, "body", go.GetComponent<SpriteRenderer>());
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path); // Overwrites, keeps GUID.
+            Object.DestroyImmediate(go);
+            return prefab.GetComponent<Enemy>();
         }
 
         // Unlit sprite material so the level needs no 2D lights to be visible.
