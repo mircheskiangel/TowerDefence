@@ -14,6 +14,8 @@ namespace TowerDefense
         [Min(0f)] public float damage = 10f;
         [Tooltip("Shots per second.")]
         [Min(0.1f)] public float fireRate = 1.5f;
+        [Tooltip("Projectile speed in cells per second.")]
+        [Min(0.5f)] public float projectileSpeed = 8f;
         public Color color = Color.white;
     }
 }

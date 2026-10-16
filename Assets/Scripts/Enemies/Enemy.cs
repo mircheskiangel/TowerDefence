@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,6 +9,19 @@ namespace TowerDefense
     // so it reacts to new obstacles mid-walk without teleporting.
     public class Enemy : MonoBehaviour
     {
+        // Raised once when an enemy is killed by damage (WaveManager / stats can listen).
+        public static event Action<Enemy> OnDied;
+        // Raised once when an enemy reaches the goal (used for lives in M5). Not a death: no gold.
+        public static event Action<Enemy> OnReachedGoal;
+
+        // Static events survive between plays if Domain Reload is disabled, so clear them at Play start.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticEvents()
+        {
+            OnDied = null;
+            OnReachedGoal = null;
+        }
+
         [SerializeField] private SpriteRenderer body;
 
         private EnemySO data;
@@ -164,26 +178,42 @@ namespace TowerDefense
                 targetIndex++;
         }
 
+        // Ignored once the enemy is dead, so projectiles still in flight do nothing.
         public void TakeDamage(float amount)
         {
             if (IsDead || amount <= 0f) return;
-            CurrentHealth -= amount;
+            CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
             if (CurrentHealth <= 0f) Die();
         }
 
+        // Runs exactly once: IsDead is set first, so any later TakeDamage (or a second Die)
+        // returns immediately and the gold reward can never be paid twice.
         private void Die()
         {
-            IsDead = true;
-            Unsubscribe();
+            if (IsDead) return;
+            Deactivate();
+            OnDied?.Invoke(this);
+            if (PlayerResources.Instance != null) PlayerResources.Instance.AddGold(data.goldReward);
             Destroy(gameObject);
         }
 
+        // Reaching the goal is not a death: no gold. M5 will take a life via OnReachedGoal.
         private void ReachGoal()
         {
+            if (IsDead) return;
             Debug.Log($"[Enemy] {name} reached goal");
-            IsDead = true;
-            Unsubscribe();
+            Deactivate();
+            OnReachedGoal?.Invoke(this);
             Destroy(gameObject);
+        }
+
+        // Marks the enemy as finished right away. Destroy() only happens at the end of the frame,
+        // so we also leave the registry now: towers must not pick it on their next scan.
+        private void Deactivate()
+        {
+            IsDead = true;
+            EnemyRegistry.Unregister(this);
+            Unsubscribe();
         }
     }
 }

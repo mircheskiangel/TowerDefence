@@ -106,8 +106,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.Tower
   body: {fileID: 3058752290485431000}
+  projectilePrefab: {fileID: 3065703264303172423, guid: e32c8cb1ebfcc9142a952ffcdec23b30, type: 3}
   lineMaterial: {fileID: 2100000, guid: f5924ebbb4ee5304f9dcb725105ac808, type: 2}
   scanInterval: 0.1
+  showTargetLine: 0
   targetLineColor: {r: 1, g: 0.3, b: 0.3, a: 0.9}
   targetLineWidth: 0.05
   targetLineSortingOrder: 18

@@ -25,6 +25,7 @@ namespace TowerDefense.EditorTools
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
+        private const string ProjectilePrefabPath = PrefabsFolder + "/Projectile.prefab";
 
         // --- Level layout ---
         private const int GridWidth = 16;
@@ -40,6 +41,7 @@ namespace TowerDefense.EditorTools
         private static readonly Color SpawnColor = new Color(0.20f, 0.55f, 1.00f);
         private static readonly Color GoalColor = new Color(0.95f, 0.30f, 0.25f);
         private static readonly Color BasicTowerColor = new Color(0.30f, 0.75f, 0.95f);
+        private static readonly Color ProjectileColor = new Color(1.00f, 0.92f, 0.25f);
         private static readonly Color RangeColor = new Color(0.55f, 0.85f, 1.00f, 0.9f);
         private static readonly Color MessageColor = new Color(1.00f, 0.35f, 0.30f);
 
@@ -49,6 +51,7 @@ namespace TowerDefense.EditorTools
         public const int OrderRange = 3;
         public const int OrderTowers = 5;
         public const int OrderEnemies = 10;
+        public const int OrderProjectiles = 12;
         public const int OrderHighlight = 15;
         public const int OrderPathLine = 20;
 
@@ -74,12 +77,14 @@ namespace TowerDefense.EditorTools
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
             Material spriteMaterial = CreateSpriteMaterial();
-            EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 30f, moveSpeed: 2f, goldReward: 5,
+            EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 30f, moveSpeed: 2f, goldReward: 10,
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
-            EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 15,
+            EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 25,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
             CreateEnemyPrefab(circle, spriteMaterial);
-            TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f, BasicTowerColor);
+            TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
+                projectileSpeed: 8f, BasicTowerColor);
+            CreateProjectilePrefab(circle, spriteMaterial); // Before the tower prefab, which references it.
             CreateTowerPrefab(square, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
@@ -422,7 +427,8 @@ namespace TowerDefense.EditorTools
         }
 
         // Creates the TowerSO asset, or updates it in place (same GUID) if it already exists.
-        private static TowerSO CreateTowerData(string name, int cost, float range, float damage, float fireRate, Color color)
+        private static TowerSO CreateTowerData(string name, int cost, float range, float damage, float fireRate,
+            float projectileSpeed, Color color)
         {
             string path = $"{DataFolder}/{name.Replace(" ", "")}.asset";
             TowerSO data = AssetDatabase.LoadAssetAtPath<TowerSO>(path);
@@ -436,6 +442,7 @@ namespace TowerDefense.EditorTools
             data.range = range;
             data.damage = damage;
             data.fireRate = fireRate;
+            data.projectileSpeed = projectileSpeed;
             data.color = color;
             EditorUtility.SetDirty(data);
             return data;
@@ -449,8 +456,20 @@ namespace TowerDefense.EditorTools
             Tower tower = go.AddComponent<Tower>();
             SetField(tower, "body", go.GetComponent<SpriteRenderer>());
             SetField(tower, "lineMaterial", material);
+            SetField(tower, "projectilePrefab", AssetDatabase.LoadAssetAtPath<Projectile>(ProjectilePrefabPath));
 
             PrefabUtility.SaveAsPrefabAsset(go, TowerPrefabPath);
+            Object.DestroyImmediate(go);
+        }
+
+        // Small yellow circle that homes in on its target.
+        private static void CreateProjectilePrefab(Sprite circle, Material material)
+        {
+            GameObject go = CreateSpriteObject("Projectile", circle, material, ProjectileColor, OrderProjectiles);
+            go.transform.localScale = Vector3.one * CellSize * 0.2f;
+            go.AddComponent<Projectile>();
+
+            PrefabUtility.SaveAsPrefabAsset(go, ProjectilePrefabPath);
             Object.DestroyImmediate(go);
         }
 

@@ -5,12 +5,15 @@ namespace TowerDefense
 {
     // A placed tower. Every scanInterval seconds it collects the enemies within its range
     // and asks the selector for the current global TargetingMode which one to target.
-    // A debug line is drawn to the current target (shooting is added in M4 part 2).
+    // It fires a projectile at that target whenever its cooldown (1 / fireRate) is over.
     public class Tower : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer body;
+        [SerializeField] private Projectile projectilePrefab;
         [SerializeField] private Material lineMaterial;
         [SerializeField] private float scanInterval = 0.1f;
+        [Tooltip("Debug: draw a line from the tower to its current target.")]
+        [SerializeField] private bool showTargetLine = false;
         [SerializeField] private Color targetLineColor = new Color(1f, 0.3f, 0.3f, 0.9f);
         [SerializeField] private float targetLineWidth = 0.05f;
         [SerializeField] private int targetLineSortingOrder = 18;
@@ -18,6 +21,7 @@ namespace TowerDefense
         private readonly List<Enemy> inRange = new List<Enemy>(); // Reused every scan: no garbage.
         private Enemy currentTarget;
         private float scanTimer;
+        private float fireCooldown;
         private LineRenderer targetLine;
 
         public TowerSO Data { get; private set; }
@@ -35,7 +39,7 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
 
-            targetLine = CreateTargetLine();
+            if (showTargetLine) targetLine = CreateTargetLine();
             // Random first delay spreads the scans of many towers over different frames.
             scanTimer = Random.Range(0f, scanInterval);
         }
@@ -69,7 +73,21 @@ namespace TowerDefense
             // Between scans, drop a target that died or was destroyed (no stale reference).
             if (CurrentTarget == null) currentTarget = null;
 
+            fireCooldown = Mathf.Max(0f, fireCooldown - Time.deltaTime);
+            TryFire();
             UpdateTargetLine();
+        }
+
+        // Fires one projectile if the cooldown is over and the target is still alive.
+        private void TryFire()
+        {
+            if (fireCooldown > 0f || projectilePrefab == null) return;
+            Enemy target = CurrentTarget; // Re-checks alive/destroyed right before firing.
+            if (target == null) return;
+
+            Projectile projectile = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
+            projectile.Initialize(target, Data.damage, Data.projectileSpeed);
+            fireCooldown = 1f / Data.fireRate;
         }
 
         // Collects enemies within range (manual squared-distance check against the registry)

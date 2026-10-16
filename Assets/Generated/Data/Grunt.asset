@@ -15,6 +15,6 @@ MonoBehaviour:
   displayName: Grunt
   maxHealth: 30
   moveSpeed: 2
-  goldReward: 5
+  goldReward: 10
   color: {r: 1, g: 0.8, b: 0.2, a: 1}
   scale: 0.5
