@@ -116,9 +116,11 @@ namespace TowerDefense.EditorTools
             // 6. Player resources, lives, waves, tower placement and UI
             PlayerResources resources = BuildPlayerResources();
             WaveManager waveManager = BuildWaveManager(grid, resources, enemyPrefab, waves);
-            MessageDisplay messages = BuildUI(resources, waveManager);
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages);
-            BuildDebugKeys(resources); // TEMPORARY
+            GameManager gameManager = BuildGameManager(resources, waveManager);
+            SetField(waveManager, "gameManager", gameManager);
+            MessageDisplay messages = BuildUI(resources, waveManager, gameManager);
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages, gameManager);
+            BuildDebugKeys(resources, gameManager); // TEMPORARY
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
 
             // 8. Save and register in Build Settings
@@ -196,7 +198,7 @@ namespace TowerDefense.EditorTools
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
-            TowerSO towerData, Sprite square, Sprite ring, Material material, MessageDisplay messages)
+            TowerSO towerData, Sprite square, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
         {
             GameObject go = new GameObject("TowerPlacer");
             TowerPlacer placer = go.AddComponent<TowerPlacer>();
@@ -219,19 +221,103 @@ namespace TowerDefense.EditorTools
             SetField(placer, "highlight", highlightRenderer);
             SetField(placer, "rangeCircle", rangeRenderer);
             SetField(placer, "messages", messages);
+            SetField(placer, "gameManager", gameManager);
+        }
+
+        // Game state machine (Playing / Won / Lost), listening to lives and waves.
+        private static GameManager BuildGameManager(PlayerResources resources, WaveManager waveManager)
+        {
+            GameObject go = new GameObject("GameManager");
+            GameManager manager = go.AddComponent<GameManager>();
+            SetField(manager, "resources", resources);
+            SetField(manager, "waves", waveManager);
+            return manager;
+        }
+
+        // Full-screen Win/Lose overlay: dark panel, big title, result line and a Restart button.
+        // Created last in the Canvas so it draws on top of the HUD. The GameOverPanel script sits
+        // on the always-active parent; only the "Panel" child is shown/hidden.
+        private static void BuildGameOverPanel(Transform canvas, GameManager gameManager, PlayerResources resources, WaveManager waveManager)
+        {
+            GameObject root = new GameObject("GameOverUI", typeof(RectTransform));
+            root.transform.SetParent(canvas, false);
+            StretchFull(root.GetComponent<RectTransform>());
+
+            GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(root.transform, false);
+            StretchFull(panel.GetComponent<RectTransform>());
+            Image background = panel.GetComponent<Image>();
+            background.color = new Color(0f, 0f, 0f, 0.75f);
+            background.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
+
+            TextMeshProUGUI title = CreateCenteredText("Title", panel.transform, "GAME OVER", 110, new Vector2(0f, 110f), new Vector2(1200f, 150f));
+            title.fontStyle = FontStyles.Bold;
+            TextMeshProUGUI detail = CreateCenteredText("Detail", panel.transform, "", 44, new Vector2(0f, 10f), new Vector2(1200f, 70f));
+
+            GameObject buttonGo = new GameObject("RestartButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonGo.transform.SetParent(panel.transform, false);
+            RectTransform buttonRect = buttonGo.GetComponent<RectTransform>();
+            buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            buttonRect.anchoredPosition = new Vector2(0f, -110f);
+            buttonRect.sizeDelta = new Vector2(360f, 96f);
+            Image buttonImage = buttonGo.GetComponent<Image>();
+            buttonImage.color = new Color(0.30f, 0.75f, 0.95f);
+            Button button = buttonGo.GetComponent<Button>();
+            button.targetGraphic = buttonImage;
+            TextMeshProUGUI buttonText = CreateCenteredText("Text", buttonGo.transform, "Restart (R)", 42, Vector2.zero, Vector2.zero);
+            StretchFull(buttonText.rectTransform);
+            buttonText.color = new Color(0.08f, 0.09f, 0.12f);
+            buttonText.raycastTarget = false;
+
+            panel.SetActive(false);
+
+            GameOverPanel script = root.AddComponent<GameOverPanel>();
+            SetField(script, "gameManager", gameManager);
+            SetField(script, "resources", resources);
+            SetField(script, "waves", waveManager);
+            SetField(script, "panel", panel);
+            SetField(script, "title", title);
+            SetField(script, "detail", detail);
+            SetField(script, "restartButton", button);
+        }
+
+        private static TextMeshProUGUI CreateCenteredText(string name, Transform parent, string text, float size, Vector2 position, Vector2 boxSize)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = boxSize;
+            TextMeshProUGUI tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = size;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.raycastTarget = false;
+            return tmp;
+        }
+
+        private static void StretchFull(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
         }
 
         // TEMPORARY debug shortcuts (G = +100 gold). Remove this call and DebugKeys.cs to drop them.
-        private static void BuildDebugKeys(PlayerResources resources)
+        private static void BuildDebugKeys(PlayerResources resources, GameManager gameManager)
         {
             GameObject go = new GameObject("DebugKeys");
             DebugKeys keys = go.AddComponent<DebugKeys>();
             SetField(keys, "resources", resources);
+            SetField(keys, "gameManager", gameManager);
         }
 
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
-        private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager)
+        private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager, GameManager gameManager)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -298,6 +384,7 @@ namespace TowerDefense.EditorTools
 
             WaveHUD waveHud = waveGo.AddComponent<WaveHUD>();
             SetField(waveHud, "waves", waveManager);
+            SetField(waveHud, "gameManager", gameManager);
             SetField(waveHud, "label", waveLabel);
 
             // Centered message near the top ("Path blocked!"), invisible until shown.
@@ -320,6 +407,8 @@ namespace TowerDefense.EditorTools
 
             MessageDisplay messages = messageGo.AddComponent<MessageDisplay>();
             SetField(messages, "label", messageLabel);
+
+            BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();

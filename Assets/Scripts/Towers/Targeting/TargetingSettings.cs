@@ -25,9 +25,10 @@ namespace TowerDefense
             SetMode((TargetingMode)(((int)Mode + 1) % count));
         }
 
-        // Reset at Play start (static state survives between plays if Domain Reload is disabled).
+        // Reset at Play start and by GameManager when a level (re)starts
+        // (static state survives between plays and reloads if Domain Reload is disabled).
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetOnPlay()
+        public static void ResetToDefault()
         {
             Mode = TargetingMode.First;
             ModeChanged = null;

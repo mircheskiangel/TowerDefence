@@ -13,6 +13,7 @@ namespace TowerDefense
     {
         [SerializeField] private GridManager grid;
         [SerializeField] private PlayerResources resources;
+        [SerializeField] private GameManager gameManager;
         [SerializeField] private Enemy enemyPrefab;
         [SerializeField] private List<WaveSO> waves = new List<WaveSO>();
         [SerializeField] private float firstCountdown = 10f;
@@ -66,7 +67,8 @@ namespace TowerDefense
         private void Update()
         {
             Keyboard keyboard = Keyboard.current;
-            if (IsCountingDown && keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
+            bool playing = gameManager == null || gameManager.IsPlaying;
+            if (playing && IsCountingDown && keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
                 skipRequested = true;
         }
 
@@ -136,7 +138,8 @@ namespace TowerDefense
         }
 
         // Safety stop: without it the coroutine would keep spawning (and the "wave cleared"
-        // logic keep advancing) after the player has already lost.
+        // logic keep advancing) after the player has already lost. GameManager handles the
+        // actual Lost state and logs it.
         private void HandleLivesDepleted()
         {
             if (routine != null) StopCoroutine(routine);
@@ -144,7 +147,6 @@ namespace TowerDefense
             IsSpawning = false;
             IsCountingDown = false;
             Stopped = true;
-            Debug.Log("[WaveManager] Game lost (placeholder)");
         }
     }
 }

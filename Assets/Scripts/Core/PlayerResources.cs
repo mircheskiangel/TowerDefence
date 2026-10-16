@@ -23,11 +23,7 @@ namespace TowerDefense
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
+            // Always take over: after a scene reload the old instance may not be destroyed yet.
             Instance = this;
             Gold = startGold;
             Lives = startLives;

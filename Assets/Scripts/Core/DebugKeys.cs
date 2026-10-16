@@ -8,6 +8,7 @@ namespace TowerDefense
     public class DebugKeys : MonoBehaviour
     {
         [SerializeField] private PlayerResources resources;
+        [SerializeField] private GameManager gameManager;
         [SerializeField] private int goldPerPress = 100;
 
         private void Start()
@@ -19,6 +20,7 @@ namespace TowerDefense
         {
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null || resources == null) return;
+            if (gameManager != null && !gameManager.IsPlaying) return;
 
             if (keyboard.gKey.wasPressedThisFrame)
             {

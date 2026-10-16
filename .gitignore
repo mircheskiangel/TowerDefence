@@ -37,3 +37,6 @@ sysinfo.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Staging area for scripts before copying them into Assets/
+_staging/

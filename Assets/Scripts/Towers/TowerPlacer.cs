@@ -19,6 +19,7 @@ namespace TowerDefense
         [SerializeField] private SpriteRenderer highlight;
         [SerializeField] private SpriteRenderer rangeCircle;
         [SerializeField] private MessageDisplay messages;
+        [SerializeField] private GameManager gameManager;
         [SerializeField] private Color validColor = new Color(0.2f, 1f, 0.3f, 0.45f);
         [SerializeField] private Color invalidColor = new Color(1f, 0.2f, 0.2f, 0.45f);
 
@@ -60,7 +61,8 @@ namespace TowerDefense
         private void Update()
         {
             Mouse mouse = Mouse.current;
-            if (mouse == null || IsPointerOverUI() || !TryGetHoveredCell(mouse, out Vector2Int cell))
+            bool playing = gameManager == null || gameManager.IsPlaying; // No building after Won/Lost.
+            if (!playing || mouse == null || IsPointerOverUI() || !TryGetHoveredCell(mouse, out Vector2Int cell))
             {
                 HideHover();
                 return;

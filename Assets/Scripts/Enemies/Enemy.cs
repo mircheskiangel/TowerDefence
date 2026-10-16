@@ -14,9 +14,10 @@ namespace TowerDefense
         // Raised once when an enemy reaches the goal (used for lives in M5). Not a death: no gold.
         public static event Action<Enemy> OnReachedGoal;
 
-        // Static events survive between plays if Domain Reload is disabled, so clear them at Play start.
+        // Static events survive between plays and scene reloads if Domain Reload is disabled.
+        // Cleared at Play start and by GameManager when a level (re)starts.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStaticEvents()
+        public static void ClearStaticEvents()
         {
             OnDied = null;
             OnReachedGoal = null;

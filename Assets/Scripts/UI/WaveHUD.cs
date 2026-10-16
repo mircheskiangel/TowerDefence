@@ -3,14 +3,15 @@ using UnityEngine;
 
 namespace TowerDefense
 {
-    // Shows the wave status: "Wave 2/5 starts in 7s (Space to skip)", "Wave 2/5" or
-    // "All waves cleared". The text is only rebuilt when what it shows actually changes
+    // Shows the wave status: "Wave 2/5 starts in 7s (Space to skip)", "Wave 2/5",
+    // "All waves cleared" or "Defeated". The text is only rebuilt when what it shows actually changes
     // (phase, wave number or whole seconds), so no new string is allocated every frame.
     public class WaveHUD : MonoBehaviour
     {
-        private enum Phase { None, Countdown, Wave, AllCleared }
+        private enum Phase { None, Countdown, Wave, AllCleared, Defeated }
 
         [SerializeField] private WaveManager waves;
+        [SerializeField] private GameManager gameManager;
         [SerializeField] private TMP_Text label;
 
         private Phase shownPhase = Phase.None;
@@ -21,7 +22,8 @@ namespace TowerDefense
         {
             if (waves == null || label == null) return;
 
-            Phase phase = waves.AllCleared ? Phase.AllCleared
+            Phase phase = gameManager != null && gameManager.State == GameState.Lost ? Phase.Defeated
+                        : waves.AllCleared ? Phase.AllCleared
                         : waves.IsCountingDown ? Phase.Countdown
                         : waves.CurrentWaveNumber > 0 ? Phase.Wave
                         : Phase.None;
@@ -43,6 +45,9 @@ namespace TowerDefense
                     break;
                 case Phase.AllCleared:
                     label.text = "All waves cleared";
+                    break;
+                case Phase.Defeated:
+                    label.text = "Defeated";
                     break;
                 default:
                     label.text = "";

@@ -37,11 +37,8 @@ namespace TowerDefense
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
+            // Always take over: after a scene reload the old instance may not be destroyed yet,
+            // and it must never cause the new level's grid to be destroyed instead.
             Instance = this;
             blocked = new bool[width, height];
         }

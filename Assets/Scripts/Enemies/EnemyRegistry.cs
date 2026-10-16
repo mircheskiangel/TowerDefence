@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace TowerDefense
 {
@@ -23,20 +22,18 @@ namespace TowerDefense
             active.Remove(enemy);
         }
 
-        // Runs when Play mode starts, even if Domain Reload is disabled (static fields would
-        // otherwise keep enemies from the previous play session).
+        // Called by GameManager when a level (re)starts.
+        public static void Clear()
+        {
+            active.Clear();
+        }
+
+        // Also runs when Play mode starts, even if Domain Reload is disabled (static fields
+        // would otherwise keep enemies from the previous play session).
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetOnPlay()
         {
-            active.Clear();
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-        }
-
-        // A freshly loaded level starts with no enemies (they are only spawned at runtime).
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            if (mode == LoadSceneMode.Single) active.Clear();
+            Clear();
         }
     }
 }
