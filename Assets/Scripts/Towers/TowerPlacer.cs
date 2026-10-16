@@ -85,10 +85,10 @@ namespace TowerDefense
             else
                 rangeCircle.enabled = false;
 
-            // A click on a free, affordable cell always runs the full check again (TryPlace),
+            // A click on a free, affordable cell always runs the full check again (TryPlaceTower),
             // because enemies may have moved since the hover result was cached.
             if (mouse.leftButton.wasPressedThisFrame && free && affordable)
-                TryPlace(cell);
+                TryPlaceTower(cell);
         }
 
         // Mouse position (pixels) -> world position -> grid cell. False if outside the grid.
@@ -157,14 +157,19 @@ namespace TowerDefense
             }
         }
 
-        private void TryPlace(Vector2Int cell)
+        // Places a tower if every rule allows it: game still playing, free cell, enough gold,
+        // and the path stays open. Returns true on success. Used by mouse clicks (and by the
+        // editor-only BalanceBot, so automated tests follow exactly the same rules).
+        public bool TryPlaceTower(Vector2Int cell)
         {
+            if (gameManager != null && !gameManager.IsPlaying) return false;
+            if (!IsFreeCell(cell) || !resources.CanAfford(towerData.cost)) return false;
             if (!SimulatePlacement(cell))
             {
                 messages.Show("Path blocked!");
-                return;
+                return false;
             }
-            if (!resources.TrySpend(towerData.cost)) return;
+            if (!resources.TrySpend(towerData.cost)) return false;
 
             Tower tower = Instantiate(towerPrefab, grid.CellToWorld(cell), Quaternion.identity, container);
             tower.Initialize(towerData, cell);
@@ -172,7 +177,11 @@ namespace TowerDefense
 
             // The real change: raises GridChanged -> every enemy and the path view re-path.
             grid.SetBlocked(cell, true);
+            return true;
         }
+
+        public int TowerCost => towerData != null ? towerData.cost : 0;
+        public int TowerCount => towers.Count;
 
         private void ShowRange(Vector2Int cell, float range)
         {

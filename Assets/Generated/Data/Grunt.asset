@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Grunt
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.EnemySO
   displayName: Grunt
-  maxHealth: 30
-  moveSpeed: 2
-  goldReward: 10
+  maxHealth: 76
+  moveSpeed: 2.3
+  goldReward: 4
   color: {r: 1, g: 0.8, b: 0.2, a: 1}
   scale: 0.5

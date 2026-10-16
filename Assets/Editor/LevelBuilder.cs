@@ -36,6 +36,10 @@ namespace TowerDefense.EditorTools
         private static readonly Vector2Int SpawnCell = new Vector2Int(0, 5);
         private static readonly Vector2Int GoalCell = new Vector2Int(15, 4);
 
+        // --- Balance (tuned in M6 with Assets/Editor/BalanceBot.cs) ---
+        private const int StartGold = 100;
+        private const int StartLives = 10;
+
         // --- Colors ---
         private static readonly Color BackgroundColor = new Color(0.08f, 0.09f, 0.12f);
         private static readonly Color TileColorA = new Color(0.24f, 0.36f, 0.24f);
@@ -80,9 +84,9 @@ namespace TowerDefense.EditorTools
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
             Material spriteMaterial = CreateSpriteMaterial();
-            EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 30f, moveSpeed: 2f, goldReward: 10,
+            EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
-            EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 25,
+            EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
             CreateEnemyPrefab(circle, spriteMaterial);
             List<WaveSO> waves = CreateWaves(grunt, tank);
@@ -192,6 +196,8 @@ namespace TowerDefense.EditorTools
         {
             GameObject go = new GameObject("PlayerResources");
             PlayerResources resources = go.AddComponent<PlayerResources>();
+            SetField(resources, "startGold", StartGold);
+            SetField(resources, "startLives", StartLives);
             LivesHandler lives = go.AddComponent<LivesHandler>();
             SetField(lives, "resources", resources);
             return resources;
@@ -537,7 +543,8 @@ namespace TowerDefense.EditorTools
             return data;
         }
 
-        // The 5 waves of the level (TEMPORARY numbers; balanced in M6).
+        // The 5 waves of the level. Counts/intervals were kept from M5: the balance was tuned
+        // through enemy stats and rewards instead (see README / BalanceBot results).
         private static List<WaveSO> CreateWaves(EnemySO grunt, EnemySO tank)
         {
             return new List<WaveSO>

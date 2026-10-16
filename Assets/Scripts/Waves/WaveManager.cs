@@ -67,9 +67,15 @@ namespace TowerDefense
         private void Update()
         {
             Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
+                SkipCountdown();
+        }
+
+        // Ends the current countdown early (Space key; also used by the editor-only BalanceBot).
+        public void SkipCountdown()
+        {
             bool playing = gameManager == null || gameManager.IsPlaying;
-            if (playing && IsCountingDown && keyboard != null && keyboard.spaceKey.wasPressedThisFrame)
-                skipRequested = true;
+            if (playing && IsCountingDown) skipRequested = true;
         }
 
         private IEnumerator RunWaves()
