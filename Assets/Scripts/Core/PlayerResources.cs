@@ -18,6 +18,9 @@ namespace TowerDefense
         // Raised whenever gold or lives change.
         public event Action Changed;
 
+        // Raised exactly once, when lives drop to 0.
+        public event Action LivesDepleted;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -56,12 +59,14 @@ namespace TowerDefense
             Changed?.Invoke();
         }
 
-        // Used in M5 when an enemy reaches the goal.
+        // Called when an enemy reaches the goal. Lives never go below 0, and because nothing
+        // happens once Lives is 0, LivesDepleted can only be raised one time.
         public void LoseLife(int amount = 1)
         {
             if (amount <= 0 || Lives <= 0) return;
             Lives = Mathf.Max(0, Lives - amount);
             Changed?.Invoke();
+            if (Lives == 0) LivesDepleted?.Invoke();
         }
     }
 }

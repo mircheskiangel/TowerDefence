@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEditor;
@@ -22,6 +23,7 @@ namespace TowerDefense.EditorTools
         private const string SpritesFolder = GeneratedFolder + "/Sprites";
         private const string MaterialsFolder = GeneratedFolder + "/Materials";
         private const string DataFolder = GeneratedFolder + "/Data";
+        private const string WavesFolder = DataFolder + "/Waves";
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
@@ -70,6 +72,7 @@ namespace TowerDefense.EditorTools
             EnsureFolder(SpritesFolder);
             EnsureFolder(MaterialsFolder);
             EnsureFolder(DataFolder);
+            EnsureFolder(WavesFolder);
             EnsureFolder(PrefabsFolder);
 
             // 1. Assets
@@ -82,6 +85,7 @@ namespace TowerDefense.EditorTools
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 120f, moveSpeed: 1f, goldReward: 25,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
             CreateEnemyPrefab(circle, spriteMaterial);
+            List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
             CreateProjectilePrefab(circle, spriteMaterial); // Before the tower prefab, which references it.
@@ -109,12 +113,10 @@ namespace TowerDefense.EditorTools
             Enemy enemyPrefab = AssetDatabase.LoadAssetAtPath<Enemy>(EnemyPrefabPath);
             Tower towerPrefab = AssetDatabase.LoadAssetAtPath<Tower>(TowerPrefabPath);
 
-            // 6. Temporary enemy spawner (replaced by WaveManager in M5).
-            BuildTestSpawner(grid, enemyPrefab, grunt, tank);
-
-            // 7. Player resources, tower placement and UI
+            // 6. Player resources, lives, waves, tower placement and UI
             PlayerResources resources = BuildPlayerResources();
-            MessageDisplay messages = BuildUI(resources);
+            WaveManager waveManager = BuildWaveManager(grid, resources, enemyPrefab, waves);
+            MessageDisplay messages = BuildUI(resources, waveManager);
             BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages);
             BuildDebugKeys(resources); // TEMPORARY
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
@@ -183,10 +185,14 @@ namespace TowerDefense.EditorTools
             SetField(view, "sortingOrder", OrderPathLine);
         }
 
+        // PlayerResources plus the LivesHandler that takes a life per enemy reaching the goal.
         private static PlayerResources BuildPlayerResources()
         {
             GameObject go = new GameObject("PlayerResources");
-            return go.AddComponent<PlayerResources>();
+            PlayerResources resources = go.AddComponent<PlayerResources>();
+            LivesHandler lives = go.AddComponent<LivesHandler>();
+            SetField(lives, "resources", resources);
+            return resources;
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
@@ -225,7 +231,7 @@ namespace TowerDefense.EditorTools
 
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
-        private static MessageDisplay BuildUI(PlayerResources resources)
+        private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -274,6 +280,26 @@ namespace TowerDefense.EditorTools
             TargetingHUD targetingHud = targetingGo.AddComponent<TargetingHUD>();
             SetField(targetingHud, "label", targetingLabel);
 
+            // Third label: wave status / countdown.
+            GameObject waveGo = new GameObject("WaveLabel", typeof(RectTransform));
+            waveGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform waveRect = waveGo.GetComponent<RectTransform>();
+            waveRect.anchorMin = waveRect.anchorMax = new Vector2(0f, 1f);
+            waveRect.pivot = new Vector2(0f, 1f);
+            waveRect.anchoredPosition = new Vector2(24f, -104f);
+            waveRect.sizeDelta = new Vector2(900f, 50f);
+
+            TextMeshProUGUI waveLabel = waveGo.AddComponent<TextMeshProUGUI>();
+            waveLabel.text = "";
+            waveLabel.fontSize = 30;
+            waveLabel.color = new Color(1f, 0.9f, 0.6f);
+            waveLabel.alignment = TextAlignmentOptions.TopLeft;
+            waveLabel.raycastTarget = false;
+
+            WaveHUD waveHud = waveGo.AddComponent<WaveHUD>();
+            SetField(waveHud, "waves", waveManager);
+            SetField(waveHud, "label", waveLabel);
+
             // Centered message near the top ("Path blocked!"), invisible until shown.
             GameObject messageGo = new GameObject("MessageLabel", typeof(RectTransform));
             messageGo.transform.SetParent(canvasGo.transform, false);
@@ -301,14 +327,21 @@ namespace TowerDefense.EditorTools
             return messages;
         }
 
-        private static void BuildTestSpawner(GridManager grid, Enemy enemyPrefab, EnemySO grunt, EnemySO tank)
+        private static WaveManager BuildWaveManager(GridManager grid, PlayerResources resources, Enemy enemyPrefab, List<WaveSO> waves)
         {
-            GameObject go = new GameObject("TestSpawner");
-            TestSpawner spawner = go.AddComponent<TestSpawner>();
-            SetField(spawner, "grid", grid);
-            SetField(spawner, "enemyPrefab", enemyPrefab);
-            SetField(spawner, "gruntData", grunt);
-            SetField(spawner, "tankData", tank);
+            GameObject go = new GameObject("WaveManager");
+            WaveManager manager = go.AddComponent<WaveManager>();
+            SetField(manager, "grid", grid);
+            SetField(manager, "resources", resources);
+            SetField(manager, "enemyPrefab", enemyPrefab);
+
+            SerializedObject so = new SerializedObject(manager);
+            SerializedProperty list = so.FindProperty("waves");
+            list.arraySize = waves.Count;
+            for (int i = 0; i < waves.Count; i++)
+                list.GetArrayElementAtIndex(i).objectReferenceValue = waves[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return manager;
         }
 
         // Assigns a [SerializeField] (private) field through Unity's serialization,
@@ -413,6 +446,39 @@ namespace TowerDefense.EditorTools
             data.scale = scale;
             EditorUtility.SetDirty(data);
             return data;
+        }
+
+        // The 5 waves of the level (TEMPORARY numbers; balanced in M6).
+        private static List<WaveSO> CreateWaves(EnemySO grunt, EnemySO tank)
+        {
+            return new List<WaveSO>
+            {
+                CreateWave("Wave1", Group(grunt, 5, 1.5f)),
+                CreateWave("Wave2", Group(grunt, 8, 1.2f)),
+                CreateWave("Wave3", Group(grunt, 6, 1.2f), Group(tank, 2, 3f, delayBefore: 2f)),
+                CreateWave("Wave4", Group(grunt, 10, 1.0f), Group(tank, 4, 2.5f, delayBefore: 2f)),
+                CreateWave("Wave5", Group(grunt, 12, 0.9f), Group(tank, 6, 2f, delayBefore: 2f)),
+            };
+        }
+
+        private static WaveSO.SpawnGroup Group(EnemySO enemy, int count, float interval, float delayBefore = 0f)
+        {
+            return new WaveSO.SpawnGroup { enemy = enemy, count = count, spawnInterval = interval, delayBefore = delayBefore };
+        }
+
+        // Creates the WaveSO asset, or overwrites its groups in place (same GUID) if it exists.
+        private static WaveSO CreateWave(string name, params WaveSO.SpawnGroup[] groups)
+        {
+            string path = $"{WavesFolder}/{name}.asset";
+            WaveSO wave = AssetDatabase.LoadAssetAtPath<WaveSO>(path);
+            if (wave == null)
+            {
+                wave = ScriptableObject.CreateInstance<WaveSO>();
+                AssetDatabase.CreateAsset(wave, path);
+            }
+            wave.groups = new List<WaveSO.SpawnGroup>(groups);
+            EditorUtility.SetDirty(wave);
+            return wave;
         }
 
         // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
