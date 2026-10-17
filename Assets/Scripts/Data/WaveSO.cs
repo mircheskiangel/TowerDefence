@@ -22,15 +22,5 @@ namespace TowerDefense
         }
 
         public List<SpawnGroup> groups = new List<SpawnGroup>();
-
-        public int TotalEnemies
-        {
-            get
-            {
-                int total = 0;
-                foreach (SpawnGroup group in groups) total += group.count;
-                return total;
-            }
-        }
     }
 }

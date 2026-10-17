@@ -54,9 +54,6 @@ namespace TowerDefense
         // re-path an enemy that took a long detour may have walked more but still be further away.
         public float PathProgress => -RemainingDistance;
 
-        // Total distance walked since spawning, in cells (for stats/debugging).
-        public float DistanceWalked { get; private set; }
-
         // Distance left to the goal along the current path, in cells (used by "First" targeting).
         public float RemainingDistance
         {
@@ -180,7 +177,6 @@ namespace TowerDefense
             Vector3 target = grid.CellToWorld(path[targetIndex]);
             float step = data.moveSpeed * grid.CellSize * Time.deltaTime;
             Vector3 newPosition = Vector3.MoveTowards(transform.position, target, step);
-            DistanceWalked += Vector3.Distance(transform.position, newPosition) / grid.CellSize;
             transform.position = newPosition;
 
             if ((newPosition - target).sqrMagnitude < 0.000001f)
@@ -212,7 +208,6 @@ namespace TowerDefense
         private void ReachGoal()
         {
             if (IsDead) return;
-            Debug.Log($"[Enemy] {name} reached goal");
             Deactivate();
             OnReachedGoal?.Invoke(this);
             Destroy(gameObject);

@@ -126,7 +126,6 @@ namespace TowerDefense.EditorTools
             SetField(waveManager, "gameManager", gameManager);
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager);
             BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages, gameManager);
-            BuildDebugKeys(resources, gameManager); // TEMPORARY
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
 
             // 8. Save and register in Build Settings
@@ -312,15 +311,6 @@ namespace TowerDefense.EditorTools
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-        }
-
-        // TEMPORARY debug shortcuts (G = +100 gold). Remove this call and DebugKeys.cs to drop them.
-        private static void BuildDebugKeys(PlayerResources resources, GameManager gameManager)
-        {
-            GameObject go = new GameObject("DebugKeys");
-            DebugKeys keys = go.AddComponent<DebugKeys>();
-            SetField(keys, "resources", resources);
-            SetField(keys, "gameManager", gameManager);
         }
 
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
@@ -641,7 +631,6 @@ namespace TowerDefense.EditorTools
             go.transform.localScale = Vector3.one * CellSize * 0.8f;
             Tower tower = go.AddComponent<Tower>();
             SetField(tower, "body", go.GetComponent<SpriteRenderer>());
-            SetField(tower, "lineMaterial", material);
             SetField(tower, "projectilePrefab", AssetDatabase.LoadAssetAtPath<Projectile>(ProjectilePrefabPath));
 
             PrefabUtility.SaveAsPrefabAsset(go, TowerPrefabPath);

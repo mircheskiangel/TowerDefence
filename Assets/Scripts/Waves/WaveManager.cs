@@ -31,7 +31,6 @@ namespace TowerDefense
         public bool IsCountingDown { get; private set; }
         public bool IsSpawning { get; private set; }
         public bool AllCleared { get; private set; }
-        public bool Stopped { get; private set; }             // Lives ran out.
 
         // --- Events ---
         public event Action<int> WaveStarted;
@@ -88,7 +87,6 @@ namespace TowerDefense
                 // 2. Spawn every group of the wave.
                 CurrentWaveNumber = i + 1;
                 WaveStarted?.Invoke(CurrentWaveNumber);
-                Debug.Log($"[WaveManager] Wave {CurrentWaveNumber}/{TotalWaves} started ({waves[i].TotalEnemies} enemies).");
                 yield return SpawnWave(waves[i]);
 
                 // 3. Wave is cleared when nothing is left to spawn AND no enemy is alive.
@@ -97,12 +95,10 @@ namespace TowerDefense
                     yield return null;
 
                 WaveCleared?.Invoke(CurrentWaveNumber);
-                Debug.Log($"[WaveManager] Wave {CurrentWaveNumber} cleared.");
             }
 
             AllCleared = true;
             routine = null;
-            Debug.Log("[WaveManager] All waves cleared");
             AllWavesCleared?.Invoke();
         }
 
@@ -152,7 +148,6 @@ namespace TowerDefense
             routine = null;
             IsSpawning = false;
             IsCountingDown = false;
-            Stopped = true;
         }
     }
 }

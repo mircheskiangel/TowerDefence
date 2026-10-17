@@ -181,7 +181,6 @@ namespace TowerDefense
         }
 
         public int TowerCost => towerData != null ? towerData.cost : 0;
-        public int TowerCount => towers.Count;
 
         private void ShowRange(Vector2Int cell, float range)
         {
