@@ -113,3 +113,5 @@ MonoBehaviour:
   targetLineColor: {r: 1, g: 0.3, b: 0.3, a: 0.9}
   targetLineWidth: 0.05
   targetLineSortingOrder: 18
+  fireKickScale: 1.1
+  fireKickDuration: 0.05

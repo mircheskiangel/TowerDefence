@@ -59,6 +59,8 @@ namespace TowerDefense.EditorTools
         public const int OrderEnemies = 10;
         public const int OrderProjectiles = 12;
         public const int OrderHighlight = 15;
+        public const int OrderHealthBarBack = 16;
+        public const int OrderHealthBarFill = 17;
         public const int OrderPathLine = 20;
 
         private const int SpritePixels = 32;
@@ -88,7 +90,7 @@ namespace TowerDefense.EditorTools
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
-            CreateEnemyPrefab(circle, spriteMaterial);
+            CreateEnemyPrefab(circle, square, spriteMaterial);
             List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
@@ -578,11 +580,33 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
-        private static void CreateEnemyPrefab(Sprite circle, Material material)
+        private static void CreateEnemyPrefab(Sprite circle, Sprite square, Material material)
         {
             GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
             Enemy enemy = go.AddComponent<Enemy>();
-            SetField(enemy, "body", go.GetComponent<SpriteRenderer>());
+            SpriteRenderer body = go.GetComponent<SpriteRenderer>();
+            SetField(enemy, "body", body);
+
+            // Visuals: hit flash on the body, and a world-space health bar child (no Canvas).
+            EnemyHitFlash flash = go.AddComponent<EnemyHitFlash>();
+            SetField(flash, "body", body);
+
+            GameObject bar = new GameObject("HealthBar");
+            bar.transform.SetParent(go.transform, false);
+            GameObject back = CreateSpriteObject("Background", square, material, new Color(0.08f, 0.08f, 0.1f, 0.85f), OrderHealthBarBack);
+            back.transform.SetParent(bar.transform, false);
+            GameObject fill = CreateSpriteObject("Fill", square, material, new Color(0.25f, 0.9f, 0.3f), OrderHealthBarFill);
+            fill.transform.SetParent(bar.transform, false);
+            back.GetComponent<SpriteRenderer>().enabled = false; // Hidden until the first hit.
+            fill.GetComponent<SpriteRenderer>().enabled = false;
+
+            EnemyHealthBar healthBar = bar.AddComponent<EnemyHealthBar>();
+            SetField(healthBar, "enemy", enemy);
+            SetField(healthBar, "background", back.GetComponent<SpriteRenderer>());
+            SetField(healthBar, "fill", fill.GetComponent<SpriteRenderer>());
+
+            SetField(enemy, "hitFlash", flash);
+            SetField(enemy, "healthBar", healthBar);
 
             PrefabUtility.SaveAsPrefabAsset(go, EnemyPrefabPath); // Overwrites, keeps GUID.
             Object.DestroyImmediate(go);

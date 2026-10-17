@@ -17,12 +17,18 @@ namespace TowerDefense
         [SerializeField] private Color targetLineColor = new Color(1f, 0.3f, 0.3f, 0.9f);
         [SerializeField] private float targetLineWidth = 0.05f;
         [SerializeField] private int targetLineSortingOrder = 18;
+        [Header("Visuals only (no effect on gameplay)")]
+        [Tooltip("Scale multiplier for a short 'kick' when the tower fires.")]
+        [SerializeField] private float fireKickScale = 1.1f;
+        [SerializeField] private float fireKickDuration = 0.05f;
 
         private readonly List<Enemy> inRange = new List<Enemy>(); // Reused every scan: no garbage.
         private Enemy currentTarget;
         private float scanTimer;
         private float fireCooldown;
         private LineRenderer targetLine;
+        private Vector3 baseScale = Vector3.one;
+        private float kickTimeLeft;
 
         public TowerSO Data { get; private set; }
         public Vector2Int Cell { get; private set; }
@@ -39,6 +45,7 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
 
+            baseScale = transform.localScale;
             if (showTargetLine) targetLine = CreateTargetLine();
             // Random first delay spreads the scans of many towers over different frames.
             scanTimer = Random.Range(0f, scanInterval);
@@ -76,6 +83,15 @@ namespace TowerDefense
             fireCooldown = Mathf.Max(0f, fireCooldown - Time.deltaTime);
             TryFire();
             UpdateTargetLine();
+            UpdateFireKick();
+        }
+
+        // Visual only: return to the normal size once the short fire "kick" is over.
+        private void UpdateFireKick()
+        {
+            if (kickTimeLeft <= 0f) return;
+            kickTimeLeft -= Time.unscaledDeltaTime;
+            if (kickTimeLeft <= 0f) transform.localScale = baseScale;
         }
 
         // Fires one projectile if the cooldown is over and the target is still alive.
@@ -88,6 +104,9 @@ namespace TowerDefense
             Projectile projectile = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
             projectile.Initialize(target, Data.damage, Data.projectileSpeed);
             fireCooldown = 1f / Data.fireRate;
+
+            transform.localScale = baseScale * fireKickScale; // Visual only.
+            kickTimeLeft = fireKickDuration;
         }
 
         // Collects enemies within range (manual squared-distance check against the registry)

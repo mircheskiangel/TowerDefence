@@ -24,6 +24,12 @@ namespace TowerDefense
         }
 
         [SerializeField] private SpriteRenderer body;
+        [Header("Visuals only (no effect on gameplay)")]
+        [SerializeField] private EnemyHitFlash hitFlash;
+        [SerializeField] private EnemyHealthBar healthBar;
+
+        // Raised whenever this enemy takes damage: (current health, max health). Used by the health bar.
+        public event Action<float, float> HealthChanged;
 
         private EnemySO data;
         private GridManager grid;
@@ -74,6 +80,8 @@ namespace TowerDefense
             transform.localScale = Vector3.one * data.scale * grid.CellSize;
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
+            if (hitFlash != null) hitFlash.SetBaseColor(data.color);
+            if (healthBar != null) healthBar.ResetBar(); // After the scale is set (keeps a fixed bar size).
 
             Subscribe();
             Repath();
@@ -184,7 +192,9 @@ namespace TowerDefense
         {
             if (IsDead || amount <= 0f) return;
             CurrentHealth = Mathf.Max(0f, CurrentHealth - amount);
+            HealthChanged?.Invoke(CurrentHealth, MaxHealth);
             if (CurrentHealth <= 0f) Die();
+            else if (hitFlash != null) hitFlash.Flash(); // Only survivors flash; the dead vanish at once.
         }
 
         // Runs exactly once: IsDead is set first, so any later TakeDamage (or a second Die)
