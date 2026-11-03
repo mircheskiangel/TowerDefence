@@ -11,6 +11,8 @@ GameObject:
   - component: {fileID: 2604004799179575528}
   - component: {fileID: 3058752290485431000}
   - component: {fileID: 3211734763630612266}
+  - component: {fileID: 4005066283893053431}
+  - component: {fileID: 4878537616076728160}
   m_Layer: 0
   m_Name: Tower
   m_TagString: Untagged
@@ -106,7 +108,40 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.Tower
   body: {fileID: 3058752290485431000}
+  look: {fileID: 4005066283893053431}
+  depth: {fileID: 4878537616076728160}
   projectilePrefab: {fileID: 3065703264303172423, guid: e32c8cb1ebfcc9142a952ffcdec23b30, type: 3}
   scanInterval: 0.1
   fireKickScale: 1.1
   fireKickDuration: 0.05
+--- !u!114 &4005066283893053431
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850301651067898151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e35d233fc53904429f716e299fbea00, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.ProjectionLook
+  target: {fileID: 3058752290485431000}
+  topDownSprite: {fileID: 21300000, guid: e9385d9f4ce70b64888d9df4ebafeec0, type: 3}
+  isometricSprite: {fileID: 21300000, guid: d191997016f104347bebb29e1a469153, type: 3}
+  isometricOnly: []
+--- !u!114 &4878537616076728160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850301651067898151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e816b05bfbc99343b43c9d545425aa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.DepthSorter
+  renderers:
+  - {fileID: 3058752290485431000}
+  parts: 01000000

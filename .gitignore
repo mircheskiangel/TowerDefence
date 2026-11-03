@@ -40,3 +40,6 @@ Thumbs.db
 
 # Staging area for scripts before copying them into Assets/
 _staging/
+
+# Screenshots taken for review (not part of the project)
+Screenshots/

@@ -10,6 +10,8 @@ namespace TowerDefense
     public class Tower : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer body;
+        [SerializeField] private ProjectionLook look;   // Visual: flat square / standing tower.
+        [SerializeField] private DepthSorter depth;     // Visual: isometric draw order.
         [SerializeField] private Projectile projectilePrefab;
         [SerializeField] private float scanInterval = 0.1f;
         [Header("Visuals only (no effect on gameplay)")]
@@ -44,6 +46,7 @@ namespace TowerDefense
             if (body != null) body.color = data.color;
 
             baseScale = transform.localScale;
+            ApplyView();
             // Random first delay spreads the scans of many towers over different frames.
             scanTimer = Random.Range(0f, scanInterval);
         }
@@ -66,7 +69,16 @@ namespace TowerDefense
         // Visual only: after a projection switch, draw the tower on its cell again.
         private void SnapViewToGrid()
         {
-            if (grid != null) transform.position = grid.CellToWorld(Cell);
+            if (grid == null) return;
+            transform.position = grid.CellToWorld(Cell);
+            ApplyView();
+        }
+
+        // Visual only: sprite for the current projection and (isometric) draw order by depth.
+        private void ApplyView()
+        {
+            if (look != null) look.Apply(grid);
+            if (depth != null) depth.Initialize(grid, Cell);
         }
 
         private void OnModeChanged(TargetingMode mode)

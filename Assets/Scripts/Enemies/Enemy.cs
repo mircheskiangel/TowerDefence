@@ -29,6 +29,8 @@ namespace TowerDefense
         [Header("Visuals only (no effect on gameplay)")]
         [SerializeField] private EnemyHitFlash hitFlash;
         [SerializeField] private EnemyHealthBar healthBar;
+        [SerializeField] private ProjectionLook look;   // Visual: flat circle / standing circle + shadow.
+        [SerializeField] private DepthSorter depth;     // Visual: isometric draw order.
 
         // Raised whenever this enemy takes damage: (current health, max health). Used by the health bar.
         public event Action<float, float> HealthChanged;
@@ -87,7 +89,9 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
             if (hitFlash != null) hitFlash.SetBaseColor(data.color);
+            if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
             if (healthBar != null) healthBar.ResetBar(); // After the scale is set (keeps a fixed bar size).
+            if (depth != null) depth.Initialize(grid, gridPosition);
 
             Subscribe();
             Repath();
@@ -139,7 +143,11 @@ namespace TowerDefense
                 if (grid != null) grid.ProjectionChanged -= SnapViewToGrid;
                 return;
             }
-            if (grid != null) transform.position = grid.GridToWorld(gridPosition);
+            if (grid == null) return;
+            transform.position = grid.GridToWorld(gridPosition);
+            if (look != null) look.Apply(grid);
+            if (healthBar != null) healthBar.Layout();
+            if (depth != null) depth.Refresh();
         }
 
         // Recomputes the path from the cell we occupy now to the goal.
@@ -203,6 +211,7 @@ namespace TowerDefense
             Vector2 target = path[targetIndex];
             gridPosition = Vector2.MoveTowards(gridPosition, target, data.moveSpeed * Time.deltaTime);
             transform.position = grid.GridToWorld(gridPosition);
+            if (depth != null) depth.SetGridPosition(gridPosition);
 
             if ((gridPosition - target).sqrMagnitude < 0.000001f)
                 targetIndex++;

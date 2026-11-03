@@ -20,6 +20,7 @@ namespace TowerDefense
         [SerializeField] private Sprite squareHighlight;
         [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
+        [SerializeField] private RangeIndicator rangeIndicator;
         [SerializeField] private MessageDisplay messages;
         [SerializeField] private GameManager gameManager;
         [SerializeField] private Color validColor = new Color(0.2f, 1f, 0.3f, 0.45f);
@@ -51,7 +52,8 @@ namespace TowerDefense
             container = new GameObject("Towers").transform;
             ApplyHighlightShape();
             highlight.enabled = false;
-            rangeCircle.enabled = false;
+            if (rangeIndicator == null) rangeIndicator = rangeCircle.GetComponent<RangeIndicator>();
+            HideRange();
             grid.GridChanged += InvalidateHoverCache;
             grid.ProjectionChanged += ApplyHighlightShape;
         }
@@ -66,6 +68,7 @@ namespace TowerDefense
         // Visual only: a square highlight in top-down, a diamond in isometric, sized to one cell.
         private void ApplyHighlightShape()
         {
+            if (rangeIndicator != null) rangeIndicator.Invalidate();
             Sprite sprite = grid.ProjectionType == GridProjectionType.Isometric ? diamondHighlight : squareHighlight;
             if (sprite != null) highlight.sprite = sprite;
             Vector2 footprint = grid.CellFootprint;
@@ -98,7 +101,7 @@ namespace TowerDefense
             else if (valid)
                 ShowRange(cell, towerData.range);
             else
-                rangeCircle.enabled = false;
+                HideRange();
 
             // A click on a free, affordable cell always runs the full check again (TryPlaceTower),
             // because enemies may have moved since the hover result was cached.
@@ -203,18 +206,29 @@ namespace TowerDefense
 
         public int TowerCost => towerData != null ? towerData.cost : 0;
 
+        // Visual only: range is a circle in grid space; RangeIndicator draws it for the current
+        // projection (ring sprite in top-down, projected ellipse in isometric).
         private void ShowRange(Vector2Int cell, float range)
         {
-            rangeCircle.enabled = true;
-            rangeCircle.transform.position = grid.CellToWorld(cell);
-            // Visual only. The sprite is 1 world unit wide; range is in cells, so diameter = 2 * range * cell size.
-            rangeCircle.transform.localScale = Vector3.one * (range * 2f * grid.CellSize);
+            if (rangeIndicator != null) rangeIndicator.Show(grid, cell, range);
+            else
+            {
+                rangeCircle.enabled = true;
+                rangeCircle.transform.position = grid.CellToWorld(cell);
+                rangeCircle.transform.localScale = Vector3.one * (range * 2f * grid.CellSize);
+            }
+        }
+
+        private void HideRange()
+        {
+            if (rangeIndicator != null) rangeIndicator.Hide();
+            else rangeCircle.enabled = false;
         }
 
         private void HideHover()
         {
             highlight.enabled = false;
-            rangeCircle.enabled = false;
+            HideRange();
         }
 
         private static bool IsPointerOverUI()

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 924665872825912149}
   - component: {fileID: 236041517971497769}
   - component: {fileID: 3065703264303172423}
+  - component: {fileID: 8029018288056459921}
   m_Layer: 0
   m_Name: Projectile
   m_TagString: Untagged
@@ -107,4 +108,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.Projectile
   speed: 8
   hitDistance: 0.1
+  isometricHeight: 0.35
+  depth: {fileID: 8029018288056459921}
   maxLifetime: 3
+--- !u!114 &8029018288056459921
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8891715701357429010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e816b05bfbc99343b43c9d545425aa5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.DepthSorter
+  renderers:
+  - {fileID: 236041517971497769}
+  parts: 01000000

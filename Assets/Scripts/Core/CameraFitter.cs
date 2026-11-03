@@ -14,6 +14,8 @@ namespace TowerDefense
         [Tooltip("On: size the camera to fit the whole grid. Off: use Orthographic Size below.")]
         [SerializeField] private bool autoFit = true;
         [SerializeField] private float orthographicSize = 6f;
+        [Tooltip("Isometric only: extra world units above the board, so standing units and their health bars on the back row are not cut off.")]
+        [SerializeField] private float isometricHeadroom = 0.75f;
 
         private Camera cam;
 
@@ -39,6 +41,8 @@ namespace TowerDefense
             if (cam == null) cam = GetComponent<Camera>();
 
             Bounds bounds = grid.WorldBounds; // The grid as the projection draws it.
+            if (grid.ProjectionType == GridProjectionType.Isometric)
+                bounds.Encapsulate(new Vector3(bounds.center.x, bounds.max.y + isometricHeadroom, 0f));
             float gridWidth = bounds.size.x + margin * 2f;
             float gridHeight = bounds.size.y + margin * 2f;
 

@@ -89,17 +89,20 @@ namespace TowerDefense.EditorTools
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
             Sprite diamond = CreateDiamondSprite("Diamond", DiamondPixelsWide);
+            Sprite towerIso = CreateStandingTowerSprite("TowerIso");
+            Sprite enemyIso = CreateStandingCircleSprite("EnemyIso");
+            Sprite shadow = CreateShadowSprite("Shadow");
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
-            CreateEnemyPrefab(circle, square, spriteMaterial);
+            CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial);
             List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
             CreateProjectilePrefab(circle, spriteMaterial); // Before the tower prefab, which references it.
-            CreateTowerPrefab(square, spriteMaterial);
+            CreateTowerPrefab(square, towerIso, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -225,6 +228,11 @@ namespace TowerDefense.EditorTools
             SetField(placer, "squareHighlight", square);
             SetField(placer, "diamondHighlight", diamond);
             SetField(placer, "rangeCircle", rangeRenderer);
+            RangeIndicator indicator = range.AddComponent<RangeIndicator>();
+            SetField(indicator, "ringSprite", rangeRenderer);
+            SetField(indicator, "material", material);
+            SetField(indicator, "sortingOrder", OrderRange);
+            SetField(placer, "rangeIndicator", indicator);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
         }
@@ -454,6 +462,31 @@ namespace TowerDefense.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        // Assigns a serialized array of object references.
+        private static void SetArray(Object target, string fieldName, Object[] values)
+        {
+            SerializedObject so = new SerializedObject(target);
+            SerializedProperty prop = so.FindProperty(fieldName);
+            if (prop == null) { Debug.LogError($"[LevelBuilder] Field '{fieldName}' not found on {target.GetType().Name}"); return; }
+            prop.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (values[i] == null) Debug.LogError($"[LevelBuilder] Missing object in '{fieldName}'[{i}] on {target.GetType().Name}");
+                prop.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetIntArray(Object target, string fieldName, int[] values)
+        {
+            SerializedObject so = new SerializedObject(target);
+            SerializedProperty prop = so.FindProperty(fieldName);
+            if (prop == null) { Debug.LogError($"[LevelBuilder] Field '{fieldName}' not found on {target.GetType().Name}"); return; }
+            prop.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++) prop.GetArrayElementAtIndex(i).intValue = values[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static GameObject CreateSpriteObject(string name, Sprite sprite, Material material, Color color, int order)
         {
             GameObject go = new GameObject(name);
@@ -551,6 +584,100 @@ namespace TowerDefense.EditorTools
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
+        // Isometric tower: a diamond base plate on the ground plus a shaded pillar with a cap, so it
+        // reads as an object with height. White/grey so SpriteRenderer.color tints it.
+        // 64 x 96 pixels, 1 world unit wide; pivot at the feet (the center of the base diamond).
+        private static Sprite CreateStandingTowerSprite(string name)
+        {
+            const int w = 64, h = 96, baseCy = 16;
+            Texture2D tex = NewClearTexture(w, h);
+            for (int x = 0; x < w; x++)
+            {
+                for (int y = 0; y < h; y++)
+                {
+                    float px = x + 0.5f, py = y + 0.5f;
+                    Color c = Color.clear;
+                    float baseD = Mathf.Abs(px - 32f) / 30f + Mathf.Abs(py - baseCy) / 15f;
+                    if (baseD <= 1f) c = baseD > 0.85f ? new Color(0.42f, 0.42f, 0.42f) : new Color(0.55f, 0.55f, 0.55f);
+                    if (px >= 20f && px < 44f && py >= baseCy && py < 70f)
+                        c = px < 32f ? Color.white : new Color(0.74f, 0.74f, 0.74f); // lit left face, shaded right face
+                    float capD = Mathf.Abs(px - 32f) / 12f + Mathf.Abs(py - 70f) / 6f;
+                    if (capD <= 1f) c = capD > 0.8f ? new Color(0.8f, 0.8f, 0.8f) : new Color(0.93f, 0.93f, 0.93f);
+                    tex.SetPixel(x, y, c);
+                }
+            }
+            return SaveSprite(name, tex, w, new Vector2(0.5f, baseCy / (float)h), FilterMode.Bilinear);
+        }
+
+        // Isometric enemy: the circle stands a little above its ground point. 64 x 80 pixels,
+        // 1 unit wide; the circle fills the top 64 pixels, pivot at the bottom (the feet).
+        private static Sprite CreateStandingCircleSprite(string name)
+        {
+            const int w = 64, h = 80;
+            Texture2D tex = NewClearTexture(w, h);
+            Vector2 center = new Vector2(32f, 48f);
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                {
+                    // Soft 1-pixel edge so the circle does not look octagonal when scaled.
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
+                    float a = Mathf.Clamp01(31.5f - d + 0.5f);
+                    if (a > 0f) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            return SaveSprite(name, tex, w, new Vector2(0.5f, 0f), FilterMode.Bilinear);
+        }
+
+        // Soft elliptical ground shadow, 2:1 (32 x 16 pixels = 1 x 0.5 units), tinted black at runtime.
+        private static Sprite CreateShadowSprite(string name)
+        {
+            const int w = 32, h = 16;
+            Texture2D tex = NewClearTexture(w, h);
+            for (int x = 0; x < w; x++)
+            {
+                for (int y = 0; y < h; y++)
+                {
+                    float dx = (x + 0.5f - 16f) / 16f, dy = (y + 0.5f - 8f) / 8f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (d <= 1f) tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01((1f - d) * 2.5f)));
+                }
+            }
+            return SaveSprite(name, tex, w, new Vector2(0.5f, 0.5f), FilterMode.Bilinear);
+        }
+
+        private static Texture2D NewClearTexture(int w, int h)
+        {
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            Color[] clear = new Color[w * h];
+            tex.SetPixels(clear);
+            return tex;
+        }
+
+        // Writes the texture as a PNG and imports it as a single sprite with a custom pivot.
+        private static Sprite SaveSprite(string name, Texture2D tex, int pixelsPerUnit, Vector2 pivot, FilterMode filter)
+        {
+            string path = $"{SpritesFolder}/{name}.png";
+            tex.Apply();
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            TextureImporterSettings settings = new TextureImporterSettings();
+            importer.ReadTextureSettings(settings);
+            settings.spriteAlignment = (int)SpriteAlignment.Custom;
+            settings.spritePivot = pivot;
+            importer.SetTextureSettings(settings);
+            importer.spritePixelsPerUnit = pixelsPerUnit;
+            importer.filterMode = filter;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
         // Creates the EnemySO asset, or updates it in place (same GUID) if it already exists.
         private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale)
         {
@@ -606,12 +733,18 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
-        private static void CreateEnemyPrefab(Sprite circle, Sprite square, Material material)
+        private static void CreateEnemyPrefab(Sprite circle, Sprite square, Sprite standingCircle, Sprite shadowSprite, Material material)
         {
             GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
             Enemy enemy = go.AddComponent<Enemy>();
             SpriteRenderer body = go.GetComponent<SpriteRenderer>();
             SetField(enemy, "body", body);
+
+            // Isometric only: a soft 2:1 ground shadow under the feet (hidden in top-down).
+            GameObject shadow = CreateSpriteObject("Shadow", shadowSprite, material, new Color(0f, 0f, 0f, 0.5f), OrderEnemies - 1);
+            shadow.transform.SetParent(go.transform, false);
+            shadow.transform.localScale = Vector3.one * 0.9f;
+            shadow.SetActive(false);
 
             // Visuals: hit flash on the body, and a world-space health bar child (no Canvas).
             EnemyHitFlash flash = go.AddComponent<EnemyHitFlash>();
@@ -630,9 +763,24 @@ namespace TowerDefense.EditorTools
             SetField(healthBar, "enemy", enemy);
             SetField(healthBar, "background", back.GetComponent<SpriteRenderer>());
             SetField(healthBar, "fill", fill.GetComponent<SpriteRenderer>());
+            SetField(healthBar, "body", body);
+
+            // Look per projection: flat circle in top-down, standing circle + shadow in isometric.
+            ProjectionLook look = go.AddComponent<ProjectionLook>();
+            SetField(look, "target", body);
+            SetField(look, "topDownSprite", circle);
+            SetField(look, "isometricSprite", standingCircle);
+            SetArray(look, "isometricOnly", new Object[] { shadow });
+
+            // Isometric draw order: shadow < body < bar background < bar fill, all by depth.
+            DepthSorter depth = go.AddComponent<DepthSorter>();
+            SetArray(depth, "renderers", new Object[] { shadow.GetComponent<SpriteRenderer>(), body, back.GetComponent<SpriteRenderer>(), fill.GetComponent<SpriteRenderer>() });
+            SetIntArray(depth, "parts", new[] { DepthSorter.PartShadow, DepthSorter.PartBody, DepthSorter.PartBarBack, DepthSorter.PartBarFill });
 
             SetField(enemy, "hitFlash", flash);
             SetField(enemy, "healthBar", healthBar);
+            SetField(enemy, "look", look);
+            SetField(enemy, "depth", depth);
 
             PrefabUtility.SaveAsPrefabAsset(go, EnemyPrefabPath); // Overwrites, keeps GUID.
             Object.DestroyImmediate(go);
@@ -661,12 +809,23 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic tower prefab (white square, slightly smaller than a cell); colored from TowerSO.
-        private static void CreateTowerPrefab(Sprite square, Material material)
+        private static void CreateTowerPrefab(Sprite square, Sprite standingTower, Material material)
         {
             GameObject go = CreateSpriteObject("Tower", square, material, Color.white, OrderTowers);
             go.transform.localScale = Vector3.one * CellSize * 0.8f;
             Tower tower = go.AddComponent<Tower>();
-            SetField(tower, "body", go.GetComponent<SpriteRenderer>());
+            SpriteRenderer body = go.GetComponent<SpriteRenderer>();
+            SetField(tower, "body", body);
+
+            ProjectionLook look = go.AddComponent<ProjectionLook>();
+            SetField(look, "target", body);
+            SetField(look, "topDownSprite", square);
+            SetField(look, "isometricSprite", standingTower);
+            DepthSorter depth = go.AddComponent<DepthSorter>();
+            SetArray(depth, "renderers", new Object[] { body });
+            SetIntArray(depth, "parts", new[] { DepthSorter.PartBody });
+            SetField(tower, "look", look);
+            SetField(tower, "depth", depth);
             SetField(tower, "projectilePrefab", AssetDatabase.LoadAssetAtPath<Projectile>(ProjectilePrefabPath));
 
             PrefabUtility.SaveAsPrefabAsset(go, TowerPrefabPath);
@@ -678,7 +837,11 @@ namespace TowerDefense.EditorTools
         {
             GameObject go = CreateSpriteObject("Projectile", circle, material, ProjectileColor, OrderProjectiles);
             go.transform.localScale = Vector3.one * CellSize * 0.2f;
-            go.AddComponent<Projectile>();
+            Projectile projectile = go.AddComponent<Projectile>();
+            DepthSorter depth = go.AddComponent<DepthSorter>();
+            SetArray(depth, "renderers", new Object[] { go.GetComponent<SpriteRenderer>() });
+            SetIntArray(depth, "parts", new[] { DepthSorter.PartBody });
+            SetField(projectile, "depth", depth);
 
             PrefabUtility.SaveAsPrefabAsset(go, ProjectilePrefabPath);
             Object.DestroyImmediate(go);

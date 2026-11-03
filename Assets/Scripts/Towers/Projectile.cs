@@ -12,6 +12,9 @@ namespace TowerDefense
         [Tooltip("Flight speed in cells per second.")]
         [SerializeField] private float speed = 8f;
         [SerializeField] private float hitDistance = 0.1f;
+        [Tooltip("Visual only: how high above the ground the projectile flies in isometric (world units).")]
+        [SerializeField] private float isometricHeight = 0.35f;
+        [SerializeField] private DepthSorter depth;
         [Tooltip("Safety net: the projectile is destroyed after this many seconds no matter what.")]
         [SerializeField] private float maxLifetime = 3f;
 
@@ -31,7 +34,11 @@ namespace TowerDefense
             gridPosition = startGridPosition;
             lastKnownPosition = target != null ? target.GridPosition : gridPosition;
             initialized = grid != null;
-            if (initialized) transform.position = grid.GridToWorld(gridPosition);
+            if (initialized)
+            {
+                PlaceView();
+                if (depth != null) depth.Initialize(grid, gridPosition);
+            }
             Destroy(gameObject, maxLifetime);
         }
 
@@ -47,13 +54,23 @@ namespace TowerDefense
                 target = null;
 
             gridPosition = Vector2.MoveTowards(gridPosition, lastKnownPosition, speed * Time.deltaTime);
-            transform.position = grid.GridToWorld(gridPosition);
+            PlaceView();
+            if (depth != null) depth.SetGridPosition(gridPosition);
 
             if ((gridPosition - lastKnownPosition).sqrMagnitude <= hitDistance * hitDistance)
             {
                 if (target != null) target.TakeDamage(damage); // Only a still-living target is hit.
                 Destroy(gameObject);
             }
+        }
+
+        // Visual only: the projected ground point, lifted a little in isometric so the shot
+        // flies at body height instead of sliding along the floor.
+        private void PlaceView()
+        {
+            Vector3 world = grid.GridToWorld(gridPosition);
+            if (grid.ProjectionType == GridProjectionType.Isometric) world.y += isometricHeight;
+            transform.position = world;
         }
     }
 }

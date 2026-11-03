@@ -9,6 +9,8 @@ namespace TowerDefense
     public class EnemyHealthBar : MonoBehaviour
     {
         [SerializeField] private Enemy enemy;
+        [Tooltip("The enemy's body sprite: the bar sits just above its top edge.")]
+        [SerializeField] private SpriteRenderer body;
         [SerializeField] private SpriteRenderer background;
         [SerializeField] private SpriteRenderer fill;
         [Tooltip("Bar size in world units (does not depend on the enemy's scale).")]
@@ -29,9 +31,18 @@ namespace TowerDefense
             if (enemy != null) enemy.HealthChanged -= HandleHealthChanged;
         }
 
-        // Called by Enemy.Initialize once its scale is known: cancels the parent's scale so the
-        // bar keeps the same world size on a small Grunt and a big Tank, and hides the bar.
+        // Called by Enemy.Initialize once its scale is known: lays the bar out and hides it.
         public void ResetBar()
+        {
+            Layout();
+            SetFill(1f);
+            SetVisible(false);
+        }
+
+        // Cancels the parent's scale so the bar keeps the same world size on a small Grunt and a
+        // big Tank, and puts it just above the top of the body sprite (a centered circle in
+        // top-down, a standing circle in isometric). Keeps the current fill and visibility.
+        public void Layout()
         {
             Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
             float sx = Mathf.Approximately(parentScale.x, 0f) ? 1f : parentScale.x;
@@ -39,13 +50,11 @@ namespace TowerDefense
 
             transform.localRotation = Quaternion.identity;
             transform.localScale = new Vector3(1f / sx, 1f / sy, 1f);
-            // The enemy sprite is 1 local unit tall, so its top edge is at local y = 0.5.
-            transform.localPosition = new Vector3(0f, 0.5f + (gapAboveEnemy + size.y * 0.5f) / sy, 0f);
+            float top = body != null && body.sprite != null ? body.sprite.bounds.max.y : 0.5f;
+            transform.localPosition = new Vector3(0f, top + (gapAboveEnemy + size.y * 0.5f) / sy, 0f);
 
             background.transform.localScale = new Vector3(size.x, size.y, 1f);
             background.transform.localPosition = Vector3.zero;
-            SetFill(1f);
-            SetVisible(false);
         }
 
         private void HandleHealthChanged(float current, float max)

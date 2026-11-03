@@ -233,6 +233,23 @@ namespace TowerDefense
             for (int y = 0; y <= height; y++)
                 Gizmos.DrawLine(GridToWorld(new Vector2(-0.5f, y - 0.5f)), GridToWorld(new Vector2(width - 0.5f, y - 0.5f)));
 
+            if (projectionType == GridProjectionType.Isometric)
+            {
+                // Cell footprints are diamonds here: outline them through the projection.
+                if (blocked != null && blocked.GetLength(0) == width && blocked.GetLength(1) == height)
+                {
+                    Gizmos.color = new Color(1f, 0f, 0f, 0.6f);
+                    for (int x = 0; x < width; x++)
+                        for (int y = 0; y < height; y++)
+                            if (blocked[x, y]) DrawCellOutline(new Vector2Int(x, y), 0.45f);
+                }
+                Gizmos.color = Color.green;
+                DrawCellOutline(spawnCell, 0.45f);
+                Gizmos.color = Color.red;
+                DrawCellOutline(goalCell, 0.45f);
+                return;
+            }
+
             Vector3 size = Vector3.one * cellSize * 0.9f;
             if (blocked != null && blocked.GetLength(0) == width && blocked.GetLength(1) == height)
             {
@@ -246,6 +263,19 @@ namespace TowerDefense
             Gizmos.DrawWireCube(CellToWorld(spawnCell), size);
             Gizmos.color = Color.red;
             Gizmos.DrawWireCube(CellToWorld(goalCell), size);
+        }
+
+        // Gizmo helper: outline of a cell's footprint, 'half' cells from its center on each side.
+        private void DrawCellOutline(Vector2Int cell, float half)
+        {
+            Vector3 a = GridToWorld(cell + new Vector2(-half, -half));
+            Vector3 b = GridToWorld(cell + new Vector2(half, -half));
+            Vector3 c = GridToWorld(cell + new Vector2(half, half));
+            Vector3 d = GridToWorld(cell + new Vector2(-half, half));
+            Gizmos.DrawLine(a, b);
+            Gizmos.DrawLine(b, c);
+            Gizmos.DrawLine(c, d);
+            Gizmos.DrawLine(d, a);
         }
     }
 }
