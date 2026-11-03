@@ -115,14 +115,31 @@ namespace TowerDefense
         {
             if (subscribed || grid == null) return;
             grid.GridChanged += Repath;
+            grid.ProjectionChanged += SnapViewToGrid;
             subscribed = true;
         }
 
         private void Unsubscribe()
         {
             if (!subscribed) return;
-            if (grid != null) grid.GridChanged -= Repath;
+            if (grid != null)
+            {
+                grid.GridChanged -= Repath;
+                grid.ProjectionChanged -= SnapViewToGrid;
+            }
             subscribed = false;
+        }
+
+        // Visual only: after a projection switch, put the transform where our grid position is
+        // drawn now (Update does this every frame while walking, but a waiting enemy does not move).
+        private void SnapViewToGrid()
+        {
+            if (this == null)
+            {
+                if (grid != null) grid.ProjectionChanged -= SnapViewToGrid;
+                return;
+            }
+            if (grid != null) transform.position = grid.GridToWorld(gridPosition);
         }
 
         // Recomputes the path from the cell we occupy now to the goal.

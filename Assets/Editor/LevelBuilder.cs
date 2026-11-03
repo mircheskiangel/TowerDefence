@@ -35,6 +35,8 @@ namespace TowerDefense.EditorTools
         private const float CellSize = 1f;
         private static readonly Vector2Int SpawnCell = new Vector2Int(0, 5);
         private static readonly Vector2Int GoalCell = new Vector2Int(15, 4);
+        // How the board is drawn when the level starts (V switches at runtime).
+        private const GridProjectionType StartProjection = GridProjectionType.TopDown;
 
         // --- Balance (tuned in M6 with Assets/Editor/BalanceBot.cs) ---
         private const int StartGold = 100;
@@ -65,6 +67,7 @@ namespace TowerDefense.EditorTools
 
         private const int SpritePixels = 32;
         private const int RingPixels = 128; // Higher resolution: the range ring is scaled up to ~5 cells.
+        private const int DiamondPixelsWide = 64; // Diamond texture is 64 x 32 pixels = 1 x 0.5 world units.
 
         [MenuItem("Tower Defense/Build Level")]
         public static void BuildLevel()
@@ -85,6 +88,7 @@ namespace TowerDefense.EditorTools
             Sprite square = CreateSprite("Square", SpriteShape.Square);
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
+            Sprite diamond = CreateDiamondSprite("Diamond", DiamondPixelsWide);
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
                 new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
@@ -103,10 +107,8 @@ namespace TowerDefense.EditorTools
             // 3. Grid
             GameObject gridGo = new GameObject("Grid");
             GridManager grid = gridGo.AddComponent<GridManager>();
-            grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell);
-            BuildTiles(grid, square, spriteMaterial);
-            CreateMarker("SpawnMarker", grid, SpawnCell, SpawnColor, square, spriteMaterial);
-            CreateMarker("GoalMarker", grid, GoalCell, GoalColor, square, spriteMaterial);
+            grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell, StartProjection);
+            BuildBoard(grid, square, diamond, spriteMaterial);
 
             // 4. Camera
             BuildCamera(grid);
@@ -125,8 +127,10 @@ namespace TowerDefense.EditorTools
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager);
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, ring, spriteMaterial, messages, gameManager);
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, ring, spriteMaterial, messages, gameManager);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
+            ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
+            SetField(switcher, "grid", grid);
 
             // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
@@ -139,31 +143,23 @@ namespace TowerDefense.EditorTools
 
         // ---------------------------------------------------------------- Scene
 
-        private static void BuildTiles(GridManager grid, Sprite sprite, Material material)
+        // The floor and spawn/goal markers are drawn by BoardView (square tiles in top-down,
+        // diamond tiles in isometric). It is configured here and built once in edit mode;
+        // at runtime it rebuilds itself when the projection is switched.
+        private static void BuildBoard(GridManager grid, Sprite square, Sprite diamond, Material material)
         {
-            Transform parent = new GameObject("Tiles").transform;
-            parent.SetParent(grid.transform, false);
-
-            for (int x = 0; x < grid.Width; x++)
-            {
-                for (int y = 0; y < grid.Height; y++)
-                {
-                    Vector2Int cell = new Vector2Int(x, y);
-                    Color color = (x + y) % 2 == 0 ? TileColorA : TileColorB;
-                    GameObject tile = CreateSpriteObject($"Tile_{x}_{y}", sprite, material, color, OrderTiles);
-                    tile.transform.SetParent(parent, false);
-                    tile.transform.position = grid.CellToWorld(cell);
-                    tile.transform.localScale = Vector3.one * grid.CellSize;
-                }
-            }
-        }
-
-        private static void CreateMarker(string name, GridManager grid, Vector2Int cell, Color color, Sprite sprite, Material material)
-        {
-            GameObject marker = CreateSpriteObject(name, sprite, material, color, OrderMarkers);
-            marker.transform.SetParent(grid.transform, false);
-            marker.transform.position = grid.CellToWorld(cell);
-            marker.transform.localScale = Vector3.one * grid.CellSize * 0.9f;
+            BoardView board = grid.gameObject.AddComponent<BoardView>();
+            SetField(board, "grid", grid);
+            SetField(board, "squareSprite", square);
+            SetField(board, "diamondSprite", diamond);
+            SetField(board, "material", material);
+            SetField(board, "tileColorA", TileColorA);
+            SetField(board, "tileColorB", TileColorB);
+            SetField(board, "spawnColor", SpawnColor);
+            SetField(board, "goalColor", GoalColor);
+            SetField(board, "tileSortingOrder", OrderTiles);
+            SetField(board, "markerSortingOrder", OrderMarkers);
+            board.Rebuild();
         }
 
         private static void BuildCamera(GridManager grid)
@@ -205,7 +201,7 @@ namespace TowerDefense.EditorTools
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
-            TowerSO towerData, Sprite square, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
+            TowerSO towerData, Sprite square, Sprite diamond, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
         {
             GameObject go = new GameObject("TowerPlacer");
             TowerPlacer placer = go.AddComponent<TowerPlacer>();
@@ -226,6 +222,8 @@ namespace TowerDefense.EditorTools
             SetField(placer, "towerPrefab", towerPrefab);
             SetField(placer, "towerData", towerData);
             SetField(placer, "highlight", highlightRenderer);
+            SetField(placer, "squareHighlight", square);
+            SetField(placer, "diamondHighlight", diamond);
             SetField(placer, "rangeCircle", rangeRenderer);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
@@ -512,6 +510,44 @@ namespace TowerDefense.EditorTools
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.SaveAndReimport();
 
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        // Generates a white 2:1 diamond (tinted later via SpriteRenderer.color) with a slightly
+        // darker rim, so neighbouring isometric tiles stay readable. Imported so that it is exactly
+        // 1 world unit wide and 0.5 tall (pixels per unit = texture width).
+        private static Sprite CreateDiamondSprite(string name, int widthPixels)
+        {
+            string path = $"{SpritesFolder}/{name}.png";
+            int heightPixels = widthPixels / 2;
+            Texture2D tex = new Texture2D(widthPixels, heightPixels, TextureFormat.RGBA32, false);
+            float halfW = widthPixels * 0.5f;
+            float halfH = heightPixels * 0.5f;
+            Color rim = new Color(0.72f, 0.72f, 0.72f, 1f);
+            for (int x = 0; x < widthPixels; x++)
+            {
+                for (int y = 0; y < heightPixels; y++)
+                {
+                    // Diamond test on pixel centers: |dx| / halfW + |dy| / halfH <= 1.
+                    float d = Mathf.Abs(x + 0.5f - halfW) / halfW + Mathf.Abs(y + 0.5f - halfH) / halfH;
+                    Color c = d > 1f ? Color.clear : (d > 0.88f ? rim : Color.white);
+                    tex.SetPixel(x, y, c);
+                }
+            }
+            tex.Apply();
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            Object.DestroyImmediate(tex);
+
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = widthPixels;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 

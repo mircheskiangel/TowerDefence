@@ -19,6 +19,8 @@ namespace TowerDefense
         [SerializeField] private Vector2 origin = Vector2.zero;
         [SerializeField] private Vector2Int spawnCell = new Vector2Int(0, 5);
         [SerializeField] private Vector2Int goalCell = new Vector2Int(15, 4);
+        [Tooltip("How the board is drawn. Gameplay is identical in every projection.")]
+        [SerializeField] private GridProjectionType projectionType = GridProjectionType.TopDown;
         [SerializeField] private bool drawDebugGrid = true;
 
         private bool[,] blocked;
@@ -27,14 +29,37 @@ namespace TowerDefense
         // Raised whenever a cell changes between walkable and blocked.
         public event Action GridChanged;
 
+        // Raised when the projection is switched at runtime (visuals must be re-placed).
+        public event Action ProjectionChanged;
+
         public int Width => width;
         public int Height => height;
         public float CellSize => cellSize;
         public Vector2Int SpawnCell => spawnCell;
         public Vector2Int GoalCell => goalCell;
+        public GridProjectionType ProjectionType => projectionType;
 
         // Created on first use, so it also works in edit mode (LevelBuilder) where Awake does not run.
-        public IGridProjection Projection => projection ??= new TopDownProjection(origin, cellSize);
+        public IGridProjection Projection => projection ??= CreateProjection(projectionType);
+
+        private IGridProjection CreateProjection(GridProjectionType type)
+        {
+            switch (type)
+            {
+                case GridProjectionType.Isometric: return new IsometricProjection(origin, cellSize);
+                default: return new TopDownProjection(origin, cellSize);
+            }
+        }
+
+        // Switches how the board is drawn. Only visuals react (ProjectionChanged); grid state,
+        // paths and all gameplay stay exactly the same because they live in grid coordinates.
+        public void SetProjection(GridProjectionType type)
+        {
+            if (type == projectionType && projection != null) return;
+            projectionType = type;
+            projection = null;
+            ProjectionChanged?.Invoke();
+        }
 
         private void Awake()
         {
@@ -56,8 +81,10 @@ namespace TowerDefense
         }
 
         // Used by the editor LevelBuilder to set up the grid.
-        public void Configure(int newWidth, int newHeight, float newCellSize, Vector2 newOrigin, Vector2Int spawn, Vector2Int goal)
+        public void Configure(int newWidth, int newHeight, float newCellSize, Vector2 newOrigin, Vector2Int spawn, Vector2Int goal,
+            GridProjectionType type = GridProjectionType.TopDown)
         {
+            projectionType = type;
             width = newWidth;
             height = newHeight;
             cellSize = newCellSize;
@@ -160,7 +187,23 @@ namespace TowerDefense
             return Projection.SortKey(gridPosition);
         }
 
-        // World-space bounding box of the whole grid (used by the camera).
+        // World-space bounding box of one cell's footprint (a square in top-down, a diamond's
+        // box in isometric). Used to size tile, marker and highlight sprites for any projection.
+        public Vector2 CellFootprint
+        {
+            get
+            {
+                Bounds b = new Bounds(GridToWorld(new Vector2(-0.5f, -0.5f)), Vector3.zero);
+                b.Encapsulate(GridToWorld(new Vector2(0.5f, -0.5f)));
+                b.Encapsulate(GridToWorld(new Vector2(-0.5f, 0.5f)));
+                b.Encapsulate(GridToWorld(new Vector2(0.5f, 0.5f)));
+                return b.size;
+            }
+        }
+
+        // World-space bounding box of the whole grid (used by the camera). Built from the four
+        // outer CORNERS of the board (cell edges, not centers), so it includes the half-cell /
+        // half-diamond margin around the edge cells in every projection.
         public Bounds WorldBounds
         {
             get

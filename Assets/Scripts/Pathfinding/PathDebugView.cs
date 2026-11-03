@@ -33,12 +33,15 @@ namespace TowerDefense
             pathfinder = new AStarPathfinder(grid);
             line = CreateLine();
             grid.GridChanged += Recompute;
+            grid.ProjectionChanged += RefreshLine;
             Recompute();
         }
 
         private void OnDestroy()
         {
-            if (grid != null) grid.GridChanged -= Recompute;
+            if (grid == null) return;
+            grid.GridChanged -= Recompute;
+            grid.ProjectionChanged -= RefreshLine;
         }
 
         private void Update()

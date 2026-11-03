@@ -22,6 +22,7 @@ namespace TowerDefense.EditorTools
         private static readonly Queue<string> queue = new Queue<string>();
         private static readonly Dictionary<string, int> runCounter = new Dictionary<string, int>();
         private static float speed = 4f;
+        private static GridProjectionType? projectionOverride;
         private static bool previousRunInBackground;
 
         // Current run
@@ -39,7 +40,8 @@ namespace TowerDefense.EditorTools
         public static bool IsRunning => phase != Phase.Idle;
         public static readonly List<string> Results = new List<string>();
 
-        public static void StartBatch(string strategies, int repeats, float timeScale = 4f)
+        // projection: draw the board with this projection in every run (null = as the scene is built).
+        public static void StartBatch(string strategies, int repeats, float timeScale = 4f, GridProjectionType? projection = null)
         {
             if (!EditorApplication.isPlaying) { Debug.LogError("[BalanceBot] Enter Play mode first."); return; }
             if (IsRunning) { Debug.LogWarning("[BalanceBot] A batch is already running."); return; }
@@ -51,13 +53,15 @@ namespace TowerDefense.EditorTools
                 for (int i = 0; i < repeats; i++) queue.Enqueue(s.Trim());
 
             speed = timeScale;
+            projectionOverride = projection;
             previousRunInBackground = Application.runInBackground;
             Application.runInBackground = true; // Session only; not saved in Player Settings.
             previousGameManager = null;
             phase = Phase.WaitingForLevel;
             EditorApplication.update += Tick;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
-            File.AppendAllText(ResultsPath, $"\n=== Batch {System.DateTime.Now:HH:mm:ss}: {strategies} x{repeats} at {timeScale}x ===\n");
+            string view = projection.HasValue ? projection.Value.ToString() : "scene default";
+            File.AppendAllText(ResultsPath, $"\n=== Batch {System.DateTime.Now:HH:mm:ss}: {strategies} x{repeats} at {timeScale}x, view {view} ===\n");
             Debug.Log($"[BalanceBot] Batch started: {queue.Count} runs.");
         }
 
@@ -125,6 +129,11 @@ namespace TowerDefense.EditorTools
             placer = Object.FindAnyObjectByType<TowerPlacer>();
             waves = Object.FindAnyObjectByType<WaveManager>();
             resources = PlayerResources.Instance;
+            if (projectionOverride.HasValue)
+            {
+                GridManager grid = Object.FindAnyObjectByType<GridManager>();
+                if (grid != null) grid.SetProjection(projectionOverride.Value);
+            }
             plan = BuildPlan(strategy, out maxTowers);
             planIndex = 0;
             towersPlaced = goldSpent = kills = 0;

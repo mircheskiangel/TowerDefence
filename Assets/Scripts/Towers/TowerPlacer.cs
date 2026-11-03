@@ -17,6 +17,8 @@ namespace TowerDefense
         [SerializeField] private Tower towerPrefab;
         [SerializeField] private TowerSO towerData;
         [SerializeField] private SpriteRenderer highlight;
+        [SerializeField] private Sprite squareHighlight;
+        [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
         [SerializeField] private MessageDisplay messages;
         [SerializeField] private GameManager gameManager;
@@ -47,15 +49,28 @@ namespace TowerDefense
 
             pathfinder = new AStarPathfinder(grid);
             container = new GameObject("Towers").transform;
-            highlight.transform.localScale = Vector3.one * grid.CellSize;
+            ApplyHighlightShape();
             highlight.enabled = false;
             rangeCircle.enabled = false;
             grid.GridChanged += InvalidateHoverCache;
+            grid.ProjectionChanged += ApplyHighlightShape;
         }
 
         private void OnDestroy()
         {
-            if (grid != null) grid.GridChanged -= InvalidateHoverCache;
+            if (grid == null) return;
+            grid.GridChanged -= InvalidateHoverCache;
+            grid.ProjectionChanged -= ApplyHighlightShape;
+        }
+
+        // Visual only: a square highlight in top-down, a diamond in isometric, sized to one cell.
+        private void ApplyHighlightShape()
+        {
+            Sprite sprite = grid.ProjectionType == GridProjectionType.Isometric ? diamondHighlight : squareHighlight;
+            if (sprite != null) highlight.sprite = sprite;
+            Vector2 footprint = grid.CellFootprint;
+            Vector2 spriteSize = highlight.sprite != null ? (Vector2)highlight.sprite.bounds.size : Vector2.one;
+            highlight.transform.localScale = new Vector3(footprint.x / spriteSize.x, footprint.y / spriteSize.y, 1f);
         }
 
         private void Update()
@@ -91,12 +106,18 @@ namespace TowerDefense
                 TryPlaceTower(cell);
         }
 
-        // Mouse position (pixels) -> world position -> grid cell. False if outside the grid.
         private bool TryGetHoveredCell(Mouse mouse, out Vector2Int cell)
         {
-            Vector2 screen = mouse.position.ReadValue();
+            return TryGetCellAtScreen(mouse.position.ReadValue(), out cell);
+        }
+
+        // Screen pixel -> world point (on the board plane) -> continuous grid position -> cell.
+        // Works for any projection because the projection does the world -> grid step.
+        // False if the point is outside the grid. Public so picking can be tested directly.
+        public bool TryGetCellAtScreen(Vector2 screen, out Vector2Int cell)
+        {
             Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
-            cell = grid.WorldToCell(world);
+            cell = GridManager.CellAt(grid.WorldToGrid(world));
             return grid.IsInBounds(cell);
         }
 

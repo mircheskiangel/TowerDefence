@@ -38,6 +38,7 @@ namespace TowerDefense
             Data = data;
             Cell = cell;
             grid = gridManager != null ? gridManager : GridManager.Instance;
+            if (grid != null) grid.ProjectionChanged += SnapViewToGrid;
             name = $"{data.displayName} ({cell.x},{cell.y})";
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
@@ -55,6 +56,17 @@ namespace TowerDefense
         private void OnDisable()
         {
             TargetingSettings.ModeChanged -= OnModeChanged;
+        }
+
+        private void OnDestroy()
+        {
+            if (grid != null) grid.ProjectionChanged -= SnapViewToGrid;
+        }
+
+        // Visual only: after a projection switch, draw the tower on its cell again.
+        private void SnapViewToGrid()
+        {
+            if (grid != null) transform.position = grid.CellToWorld(Cell);
         }
 
         private void OnModeChanged(TargetingMode mode)
