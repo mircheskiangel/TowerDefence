@@ -17,6 +17,7 @@ namespace TowerDefense
 
         private AStarPathfinder pathfinder;
         private LineRenderer line;
+        private LineRenderer overlay; // Isometric only: dim copy above the units, so the path stays visible behind tall towers.
 
         public List<Vector2Int> CurrentPath { get; private set; }
 
@@ -31,7 +32,9 @@ namespace TowerDefense
             }
 
             pathfinder = new AStarPathfinder(grid);
-            line = CreateLine();
+            line = CreateLine("PathLine", lineColor, lineWidth, sortingOrder);
+            Color dim = new Color(lineColor.r, lineColor.g, lineColor.b, 0.35f);
+            overlay = CreateLine("PathLineOverlay", dim, lineWidth * 0.6f, DepthSorter.OverlayOrder);
             grid.GridChanged += Recompute;
             grid.ProjectionChanged += RefreshLine;
             Recompute();
@@ -73,27 +76,34 @@ namespace TowerDefense
             if (line == null) return;
             bool show = visible && CurrentPath != null;
             line.enabled = show;
+            if (overlay != null) overlay.enabled = show && grid.ProjectionType == GridProjectionType.Isometric;
             if (!show) return;
 
             line.positionCount = CurrentPath.Count;
+            if (overlay != null) overlay.positionCount = CurrentPath.Count;
             for (int i = 0; i < CurrentPath.Count; i++)
-                line.SetPosition(i, grid.CellToWorld(CurrentPath[i]));
+            {
+                Vector3 p = grid.CellToWorld(CurrentPath[i]);
+                line.SetPosition(i, p);
+                if (overlay != null) overlay.SetPosition(i, p);
+            }
         }
 
-        private LineRenderer CreateLine()
+        private LineRenderer CreateLine(string objectName, Color color, float width, int order)
         {
-            GameObject go = new GameObject("PathLine");
+            GameObject go = new GameObject(objectName);
             go.transform.SetParent(transform, false);
             LineRenderer lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = true;
             lr.sharedMaterial = lineMaterial;
-            lr.startColor = lineColor;
-            lr.endColor = lineColor;
-            lr.startWidth = lineWidth;
-            lr.endWidth = lineWidth;
+            lr.startColor = color;
+            lr.endColor = color;
+            lr.startWidth = width;
+            lr.endWidth = width;
             lr.numCornerVertices = 2;
             lr.numCapVertices = 2;
-            lr.sortingOrder = sortingOrder;
+            lr.sortingOrder = order;
+            lr.enabled = false;
             return lr;
         }
     }

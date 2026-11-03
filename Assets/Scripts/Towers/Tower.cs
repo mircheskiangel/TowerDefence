@@ -24,6 +24,7 @@ namespace TowerDefense
         private float scanTimer;
         private float fireCooldown;
         private Vector3 baseScale = Vector3.one;
+        private Transform KickTarget => body != null ? body.transform : transform;
         private float kickTimeLeft;
 
         private GridManager grid;
@@ -42,10 +43,12 @@ namespace TowerDefense
             grid = gridManager != null ? gridManager : GridManager.Instance;
             if (grid != null) grid.ProjectionChanged += SnapViewToGrid;
             name = $"{data.displayName} ({cell.x},{cell.y})";
-            if (body == null) body = GetComponent<SpriteRenderer>();
+            if (body == null) body = GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = data.color;
 
-            baseScale = transform.localScale;
+            // The kick scales only the body (the square in top-down; the pillar and cap in
+            // isometric), never the base plate or the ground shadow.
+            baseScale = KickTarget.localScale;
             ApplyView();
             // Random first delay spreads the scans of many towers over different frames.
             scanTimer = Random.Range(0f, scanInterval);
@@ -110,7 +113,7 @@ namespace TowerDefense
         {
             if (kickTimeLeft <= 0f) return;
             kickTimeLeft -= Time.unscaledDeltaTime;
-            if (kickTimeLeft <= 0f) transform.localScale = baseScale;
+            if (kickTimeLeft <= 0f) KickTarget.localScale = baseScale;
         }
 
         // Fires one projectile if the cooldown is over and the target is still alive.
@@ -124,7 +127,7 @@ namespace TowerDefense
             projectile.Initialize(target, Data.damage, Data.projectileSpeed, grid, Cell);
             fireCooldown = 1f / Data.fireRate;
 
-            transform.localScale = baseScale * fireKickScale; // Visual only.
+            KickTarget.localScale = baseScale * fireKickScale; // Visual only.
             kickTimeLeft = fireKickDuration;
         }
 

@@ -17,6 +17,8 @@ namespace TowerDefense
         [SerializeField] private Tower towerPrefab;
         [SerializeField] private TowerSO towerData;
         [SerializeField] private SpriteRenderer highlight;
+        [Tooltip("Isometric only: thin diamond outline drawn above the units, so the hovered cell stays visible under a tower.")]
+        [SerializeField] private SpriteRenderer hoverOutline;
         [SerializeField] private Sprite squareHighlight;
         [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
@@ -74,6 +76,12 @@ namespace TowerDefense
             Vector2 footprint = grid.CellFootprint;
             Vector2 spriteSize = highlight.sprite != null ? (Vector2)highlight.sprite.bounds.size : Vector2.one;
             highlight.transform.localScale = new Vector3(footprint.x / spriteSize.x, footprint.y / spriteSize.y, 1f);
+            if (hoverOutline != null && hoverOutline.sprite != null)
+            {
+                Vector2 outlineSize = hoverOutline.sprite.bounds.size;
+                hoverOutline.transform.localScale = new Vector3(footprint.x / outlineSize.x, footprint.y / outlineSize.y, 1f);
+                hoverOutline.sortingOrder = DepthSorter.OverlayOrder;
+            }
         }
 
         private void Update()
@@ -94,6 +102,13 @@ namespace TowerDefense
             highlight.enabled = true;
             highlight.transform.position = grid.CellToWorld(cell);
             highlight.color = valid ? validColor : invalidColor;
+            if (hoverOutline != null)
+            {
+                hoverOutline.enabled = grid.ProjectionType == GridProjectionType.Isometric;
+                hoverOutline.transform.position = highlight.transform.position;
+                Color c = highlight.color;
+                hoverOutline.color = new Color(c.r, c.g, c.b, 0.9f);
+            }
 
             // Range circle: around an existing tower, or preview where a new tower would go.
             if (towers.TryGetValue(cell, out Tower existing) && existing != null)
@@ -228,6 +243,7 @@ namespace TowerDefense
         private void HideHover()
         {
             highlight.enabled = false;
+            if (hoverOutline != null) hoverOutline.enabled = false;
             HideRange();
         }
 

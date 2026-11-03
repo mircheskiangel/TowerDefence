@@ -36,7 +36,7 @@ namespace TowerDefense.EditorTools
         private static readonly Vector2Int SpawnCell = new Vector2Int(0, 5);
         private static readonly Vector2Int GoalCell = new Vector2Int(15, 4);
         // How the board is drawn when the level starts (V switches at runtime).
-        private const GridProjectionType StartProjection = GridProjectionType.TopDown;
+        private const GridProjectionType DefaultStartProjection = GridProjectionType.Isometric;
 
         // --- Balance (tuned in M6 with Assets/Editor/BalanceBot.cs) ---
         private const int StartGold = 100;
@@ -72,6 +72,18 @@ namespace TowerDefense.EditorTools
         [MenuItem("Tower Defense/Build Level")]
         public static void BuildLevel()
         {
+            BuildLevel(DefaultStartProjection);
+        }
+
+        // Same level, but starting in the top-down view (useful to compare the two views).
+        [MenuItem("Tower Defense/Build Level (Top-Down Start)")]
+        public static void BuildLevelTopDown()
+        {
+            BuildLevel(GridProjectionType.TopDown);
+        }
+
+        public static void BuildLevel(GridProjectionType startProjection)
+        {
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
             if (!EnsureTextMeshProResources())
@@ -90,6 +102,8 @@ namespace TowerDefense.EditorTools
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
             Sprite diamond = CreateDiamondSprite("Diamond", DiamondPixelsWide);
             Sprite towerIso = CreateStandingTowerSprite("TowerIso");
+            Sprite towerBase = CreateTowerBaseSprite("TowerIsoBase");
+            Sprite diamondOutline = CreateDiamondOutlineSprite("DiamondOutline", DiamondPixelsWide);
             Sprite enemyIso = CreateStandingCircleSprite("EnemyIso");
             Sprite shadow = CreateShadowSprite("Shadow");
             Material spriteMaterial = CreateSpriteMaterial();
@@ -102,7 +116,7 @@ namespace TowerDefense.EditorTools
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
             CreateProjectilePrefab(circle, spriteMaterial); // Before the tower prefab, which references it.
-            CreateTowerPrefab(square, towerIso, spriteMaterial);
+            CreateTowerPrefab(square, towerIso, towerBase, shadow, spriteMaterial);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -110,7 +124,7 @@ namespace TowerDefense.EditorTools
             // 3. Grid
             GameObject gridGo = new GameObject("Grid");
             GridManager grid = gridGo.AddComponent<GridManager>();
-            grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell, StartProjection);
+            grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell, startProjection);
             BuildBoard(grid, square, diamond, spriteMaterial);
 
             // 4. Camera
@@ -130,7 +144,7 @@ namespace TowerDefense.EditorTools
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager);
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, ring, spriteMaterial, messages, gameManager);
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
             SetField(switcher, "grid", grid);
@@ -204,7 +218,7 @@ namespace TowerDefense.EditorTools
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
-            TowerSO towerData, Sprite square, Sprite diamond, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
+            TowerSO towerData, Sprite square, Sprite diamond, Sprite diamondOutline, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
         {
             GameObject go = new GameObject("TowerPlacer");
             TowerPlacer placer = go.AddComponent<TowerPlacer>();
@@ -227,6 +241,11 @@ namespace TowerDefense.EditorTools
             SetField(placer, "highlight", highlightRenderer);
             SetField(placer, "squareHighlight", square);
             SetField(placer, "diamondHighlight", diamond);
+
+            GameObject outline = CreateSpriteObject("HoverOutline", diamondOutline, material, Color.white, DepthSorter.OverlayOrder);
+            outline.transform.SetParent(go.transform, false);
+            outline.GetComponent<SpriteRenderer>().enabled = false;
+            SetField(placer, "hoverOutline", outline.GetComponent<SpriteRenderer>());
             SetField(placer, "rangeCircle", rangeRenderer);
             RangeIndicator indicator = range.AddComponent<RangeIndicator>();
             SetField(indicator, "ringSprite", rangeRenderer);
@@ -337,8 +356,8 @@ namespace TowerDefense.EditorTools
             RectTransform rect = labelGo.GetComponent<RectTransform>();
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
             rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(24f, -16f);
-            rect.sizeDelta = new Vector2(700f, 60f);
+            rect.anchoredPosition = new Vector2(24f, -12f);
+            rect.sizeDelta = new Vector2(560f, 50f);
 
             TextMeshProUGUI label = labelGo.AddComponent<TextMeshProUGUI>();
             label.text = "Gold: 0  Lives: 0";
@@ -355,16 +374,17 @@ namespace TowerDefense.EditorTools
             GameObject targetingGo = new GameObject("TargetingLabel", typeof(RectTransform));
             targetingGo.transform.SetParent(canvasGo.transform, false);
             RectTransform targetingRect = targetingGo.GetComponent<RectTransform>();
-            targetingRect.anchorMin = targetingRect.anchorMax = new Vector2(0f, 1f);
-            targetingRect.pivot = new Vector2(0f, 1f);
-            targetingRect.anchoredPosition = new Vector2(24f, -64f);
-            targetingRect.sizeDelta = new Vector2(700f, 50f);
+            // Top-right corner (the HUD is one row along the top edge, above the board).
+            targetingRect.anchorMin = targetingRect.anchorMax = new Vector2(1f, 1f);
+            targetingRect.pivot = new Vector2(1f, 1f);
+            targetingRect.anchoredPosition = new Vector2(-24f, -16f);
+            targetingRect.sizeDelta = new Vector2(560f, 50f);
 
             TextMeshProUGUI targetingLabel = targetingGo.AddComponent<TextMeshProUGUI>();
             targetingLabel.text = "Targeting: First (T to change)";
             targetingLabel.fontSize = 30;
             targetingLabel.color = new Color(0.85f, 0.9f, 1f);
-            targetingLabel.alignment = TextAlignmentOptions.TopLeft;
+            targetingLabel.alignment = TextAlignmentOptions.TopRight;
             targetingLabel.raycastTarget = false;
 
             TargetingHUD targetingHud = targetingGo.AddComponent<TargetingHUD>();
@@ -374,16 +394,17 @@ namespace TowerDefense.EditorTools
             GameObject waveGo = new GameObject("WaveLabel", typeof(RectTransform));
             waveGo.transform.SetParent(canvasGo.transform, false);
             RectTransform waveRect = waveGo.GetComponent<RectTransform>();
-            waveRect.anchorMin = waveRect.anchorMax = new Vector2(0f, 1f);
-            waveRect.pivot = new Vector2(0f, 1f);
-            waveRect.anchoredPosition = new Vector2(24f, -104f);
-            waveRect.sizeDelta = new Vector2(900f, 50f);
+            // Top center.
+            waveRect.anchorMin = waveRect.anchorMax = new Vector2(0.5f, 1f);
+            waveRect.pivot = new Vector2(0.5f, 1f);
+            waveRect.anchoredPosition = new Vector2(0f, -16f);
+            waveRect.sizeDelta = new Vector2(720f, 50f);
 
             TextMeshProUGUI waveLabel = waveGo.AddComponent<TextMeshProUGUI>();
             waveLabel.text = "";
             waveLabel.fontSize = 30;
             waveLabel.color = new Color(1f, 0.9f, 0.6f);
-            waveLabel.alignment = TextAlignmentOptions.TopLeft;
+            waveLabel.alignment = TextAlignmentOptions.Top;
             waveLabel.raycastTarget = false;
 
             WaveHUD waveHud = waveGo.AddComponent<WaveHUD>();
@@ -391,14 +412,14 @@ namespace TowerDefense.EditorTools
             SetField(waveHud, "gameManager", gameManager);
             SetField(waveHud, "label", waveLabel);
 
-            // Centered message near the top ("Path blocked!"), invisible until shown.
+            // Centered message along the bottom edge ("Path blocked!"), invisible until shown.
             GameObject messageGo = new GameObject("MessageLabel", typeof(RectTransform));
             messageGo.transform.SetParent(canvasGo.transform, false);
             RectTransform messageRect = messageGo.GetComponent<RectTransform>();
-            messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 1f);
-            messageRect.pivot = new Vector2(0.5f, 1f);
-            messageRect.anchoredPosition = new Vector2(0f, -80f);
-            messageRect.sizeDelta = new Vector2(900f, 80f);
+            messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 0f);
+            messageRect.pivot = new Vector2(0.5f, 0f);
+            messageRect.anchoredPosition = new Vector2(0f, 10f);
+            messageRect.sizeDelta = new Vector2(900f, 70f);
 
             TextMeshProUGUI messageLabel = messageGo.AddComponent<TextMeshProUGUI>();
             messageLabel.text = "";
@@ -584,9 +605,9 @@ namespace TowerDefense.EditorTools
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
-        // Isometric tower: a diamond base plate on the ground plus a shaded pillar with a cap, so it
-        // reads as an object with height. White/grey so SpriteRenderer.color tints it.
-        // 64 x 96 pixels, 1 world unit wide; pivot at the feet (the center of the base diamond).
+        // Isometric tower body: a shaded pillar with a cap, so it reads as an object with height
+        // (the diamond base plate is a separate sprite, see CreateTowerBaseSprite). White/grey so
+        // SpriteRenderer.color tints it. 64 x 96 pixels, 1 world unit wide; pivot at the feet.
         private static Sprite CreateStandingTowerSprite(string name)
         {
             const int w = 64, h = 96, baseCy = 16;
@@ -597,8 +618,6 @@ namespace TowerDefense.EditorTools
                 {
                     float px = x + 0.5f, py = y + 0.5f;
                     Color c = Color.clear;
-                    float baseD = Mathf.Abs(px - 32f) / 30f + Mathf.Abs(py - baseCy) / 15f;
-                    if (baseD <= 1f) c = baseD > 0.85f ? new Color(0.42f, 0.42f, 0.42f) : new Color(0.55f, 0.55f, 0.55f);
                     if (px >= 20f && px < 44f && py >= baseCy && py < 70f)
                         c = px < 32f ? Color.white : new Color(0.74f, 0.74f, 0.74f); // lit left face, shaded right face
                     float capD = Mathf.Abs(px - 32f) / 12f + Mathf.Abs(py - 70f) / 6f;
@@ -609,22 +628,60 @@ namespace TowerDefense.EditorTools
             return SaveSprite(name, tex, w, new Vector2(0.5f, baseCy / (float)h), FilterMode.Bilinear);
         }
 
-        // Isometric enemy: the circle stands a little above its ground point. 64 x 80 pixels,
-        // 1 unit wide; the circle fills the top 64 pixels, pivot at the bottom (the feet).
+        // Isometric enemy: a small shaded sphere standing a little above its ground point.
+        // Grey-scale shading (tinted by the EnemySO color): a soft highlight to the upper left and
+        // a darker rim, so it reads as a ball. 64 x 80 pixels, 1 unit wide; the sphere fills the
+        // top 64 pixels, pivot at the bottom (the feet).
         private static Sprite CreateStandingCircleSprite(string name)
         {
             const int w = 64, h = 80;
+            const float radius = 31.5f;
             Texture2D tex = NewClearTexture(w, h);
             Vector2 center = new Vector2(32f, 48f);
+            Vector2 light = new Vector2(-0.38f, 0.42f); // highlight position, in radius units
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)
                 {
-                    // Soft 1-pixel edge so the circle does not look octagonal when scaled.
-                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
-                    float a = Mathf.Clamp01(31.5f - d + 0.5f);
-                    if (a > 0f) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                    Vector2 n = (new Vector2(x + 0.5f, y + 0.5f) - center) / radius;
+                    float d = n.magnitude;
+                    float a = Mathf.Clamp01((1f - d) * radius + 0.5f); // soft 1-pixel edge
+                    if (a <= 0f) continue;
+                    float highlight = Mathf.Pow(Mathf.Clamp01(1f - (n - light).magnitude / 0.75f), 2f);
+                    float rim = Mathf.Clamp01((d - 0.72f) / 0.28f);
+                    float shade = Mathf.Lerp(0.86f, 0.58f, rim) + 0.14f * highlight + 0.25f * highlight * highlight;
+                    tex.SetPixel(x, y, new Color(Mathf.Min(shade, 1f), Mathf.Min(shade, 1f), Mathf.Min(shade, 1f), a));
                 }
             return SaveSprite(name, tex, w, new Vector2(0.5f, 0f), FilterMode.Bilinear);
+        }
+
+        // Isometric tower base plate: a grey diamond with a darker rim, 64 x 32 pixels = 1 x 0.5
+        // units, pivot at its center (the feet). Separate from the pillar so the fire kick skips it.
+        private static Sprite CreateTowerBaseSprite(string name)
+        {
+            const int w = 64, h = 32;
+            Texture2D tex = NewClearTexture(w, h);
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                {
+                    float d = Mathf.Abs(x + 0.5f - 32f) / 30f + Mathf.Abs(y + 0.5f - 16f) / 15f;
+                    if (d <= 1f) tex.SetPixel(x, y, d > 0.85f ? new Color(0.42f, 0.42f, 0.42f) : new Color(0.55f, 0.55f, 0.55f));
+                }
+            return SaveSprite(name, tex, w, new Vector2(0.5f, 0.5f), FilterMode.Bilinear);
+        }
+
+        // Thin white diamond outline (2:1), used for the hover outline drawn above the units.
+        private static Sprite CreateDiamondOutlineSprite(string name, int widthPixels)
+        {
+            int heightPixels = widthPixels / 2;
+            float halfW = widthPixels * 0.5f, halfH = heightPixels * 0.5f;
+            Texture2D tex = NewClearTexture(widthPixels, heightPixels);
+            for (int x = 0; x < widthPixels; x++)
+                for (int y = 0; y < heightPixels; y++)
+                {
+                    float d = Mathf.Abs(x + 0.5f - halfW) / halfW + Mathf.Abs(y + 0.5f - halfH) / halfH;
+                    if (d <= 1f && d >= 0.86f) tex.SetPixel(x, y, Color.white);
+                }
+            return SaveSprite(name, tex, widthPixels, new Vector2(0.5f, 0.5f), FilterMode.Bilinear);
         }
 
         // Soft elliptical ground shadow, 2:1 (32 x 16 pixels = 1 x 0.5 units), tinted black at runtime.
@@ -741,9 +798,9 @@ namespace TowerDefense.EditorTools
             SetField(enemy, "body", body);
 
             // Isometric only: a soft 2:1 ground shadow under the feet (hidden in top-down).
-            GameObject shadow = CreateSpriteObject("Shadow", shadowSprite, material, new Color(0f, 0f, 0f, 0.5f), OrderEnemies - 1);
+            GameObject shadow = CreateSpriteObject("Shadow", shadowSprite, material, new Color(0f, 0f, 0f, 0.7f), OrderEnemies - 1);
             shadow.transform.SetParent(go.transform, false);
-            shadow.transform.localScale = Vector3.one * 0.9f;
+            shadow.transform.localScale = Vector3.one * 1.15f;
             shadow.SetActive(false);
 
             // Visuals: hit flash on the body, and a world-space health bar child (no Canvas).
@@ -809,21 +866,37 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic tower prefab (white square, slightly smaller than a cell); colored from TowerSO.
-        private static void CreateTowerPrefab(Sprite square, Sprite standingTower, Material material)
+        // Tower root (logic) with three visual children: Body (square in top-down, pillar in
+        // isometric; the only part the fire kick scales), and, isometric only, Base (diamond plate)
+        // and Shadow (soft ground shadow).
+        private static void CreateTowerPrefab(Sprite square, Sprite standingTower, Sprite basePlate, Sprite shadowSprite, Material material)
         {
-            GameObject go = CreateSpriteObject("Tower", square, material, Color.white, OrderTowers);
+            GameObject go = new GameObject("Tower");
             go.transform.localScale = Vector3.one * CellSize * 0.8f;
             Tower tower = go.AddComponent<Tower>();
-            SpriteRenderer body = go.GetComponent<SpriteRenderer>();
+
+            GameObject bodyGo = CreateSpriteObject("Body", square, material, Color.white, OrderTowers);
+            bodyGo.transform.SetParent(go.transform, false);
+            SpriteRenderer body = bodyGo.GetComponent<SpriteRenderer>();
             SetField(tower, "body", body);
+
+            GameObject baseGo = CreateSpriteObject("Base", basePlate, material, Color.white, OrderTowers - 1);
+            baseGo.transform.SetParent(go.transform, false);
+            baseGo.SetActive(false);
+
+            GameObject shadowGo = CreateSpriteObject("Shadow", shadowSprite, material, new Color(0f, 0f, 0f, 0.6f), OrderTowers - 2);
+            shadowGo.transform.SetParent(go.transform, false);
+            shadowGo.transform.localScale = Vector3.one * 1.3f;
+            shadowGo.SetActive(false);
 
             ProjectionLook look = go.AddComponent<ProjectionLook>();
             SetField(look, "target", body);
             SetField(look, "topDownSprite", square);
             SetField(look, "isometricSprite", standingTower);
+            SetArray(look, "isometricOnly", new Object[] { baseGo, shadowGo });
             DepthSorter depth = go.AddComponent<DepthSorter>();
-            SetArray(depth, "renderers", new Object[] { body });
-            SetIntArray(depth, "parts", new[] { DepthSorter.PartBody });
+            SetArray(depth, "renderers", new Object[] { shadowGo.GetComponent<SpriteRenderer>(), baseGo.GetComponent<SpriteRenderer>(), body });
+            SetIntArray(depth, "parts", new[] { 0, 1, 2 });
             SetField(tower, "look", look);
             SetField(tower, "depth", depth);
             SetField(tower, "projectilePrefab", AssetDatabase.LoadAssetAtPath<Projectile>(ProjectilePrefabPath));
