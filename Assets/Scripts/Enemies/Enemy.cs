@@ -7,6 +7,8 @@ namespace TowerDefense
     // An enemy that walks from cell center to cell center along an A* path to the goal.
     // Whenever the grid changes it re-paths from the cell it currently occupies,
     // so it reacts to new obstacles mid-walk without teleporting.
+    // Its position is kept in GRID coordinates (GridPosition); the transform is only a view of it,
+    // placed through GridManager's projection, so movement is identical in any projection.
     public class Enemy : MonoBehaviour
     {
         // Raised once when an enemy is killed by damage (WaveManager / stats can listen).
@@ -38,6 +40,7 @@ namespace TowerDefense
         private List<Vector2Int> path;  // Cells from (roughly) our position to the goal.
         private int targetIndex;        // Index in 'path' of the cell center we are walking towards.
         private bool hasRoute;          // False while no path to the goal exists (we wait).
+        private Vector2 gridPosition;   // Logical position in continuous grid coordinates.
         private bool subscribed;
 
         public EnemySO Data => data;
@@ -46,8 +49,11 @@ namespace TowerDefense
         public bool IsDead { get; private set; }
         public bool IsWaiting => !hasRoute;
 
+        // Logical position in continuous grid coordinates (integer values = cell centers).
+        public Vector2 GridPosition => gridPosition;
+
         // The cell whose square contains the enemy right now.
-        public Vector2Int CurrentCell => grid != null ? grid.WorldToCell(transform.position) : Vector2Int.zero;
+        public Vector2Int CurrentCell => GridManager.CellAt(gridPosition);
 
         // How far along its route the enemy is: higher = closer to the goal (0 = at the goal).
         // Defined as minus the remaining path length, NOT as distance walked, because after a
@@ -61,7 +67,7 @@ namespace TowerDefense
             {
                 if (!hasRoute || path == null) return float.MaxValue;
                 if (targetIndex >= path.Count) return 0f;
-                float toNext = Vector3.Distance(transform.position, grid.CellToWorld(path[targetIndex])) / grid.CellSize;
+                float toNext = Vector2.Distance(gridPosition, path[targetIndex]);
                 return toNext + (path.Count - 1 - targetIndex);
             }
         }
@@ -74,6 +80,9 @@ namespace TowerDefense
 
             CurrentHealth = data.maxHealth;
             name = data.displayName;
+            // Start where we were spawned, converted once into grid coordinates.
+            gridPosition = grid.WorldToGrid(transform.position);
+            transform.position = grid.GridToWorld(gridPosition);
             transform.localScale = Vector3.one * data.scale * grid.CellSize;
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
@@ -152,16 +161,15 @@ namespace TowerDefense
         }
 
         // True if our position lies on the straight segment between the centers of cells a and b
-        // (excluding a's center itself), i.e. we are already heading from a to b.
+        // (excluding a's center itself), i.e. we are already heading from a to b. Grid units.
         private bool IsOnSegment(Vector2Int a, Vector2Int b)
         {
-            Vector3 start = grid.CellToWorld(a);
-            Vector3 end = grid.CellToWorld(b);
-            Vector3 segment = end - start;
-            float t = Vector3.Dot(transform.position - start, segment) / segment.sqrMagnitude;
+            Vector2 start = a;
+            Vector2 segment = (Vector2)b - start;
+            float t = Vector2.Dot(gridPosition - start, segment) / segment.sqrMagnitude;
             if (t <= 0f || t > 1f) return false;
-            Vector3 closest = start + segment * t;
-            return (transform.position - closest).sqrMagnitude < 0.0001f;
+            Vector2 closest = start + segment * t;
+            return (gridPosition - closest).sqrMagnitude < 0.0001f;
         }
 
         private void Update()
@@ -174,12 +182,12 @@ namespace TowerDefense
                 return;                    // Otherwise: no route, wait in place.
             }
 
-            Vector3 target = grid.CellToWorld(path[targetIndex]);
-            float step = data.moveSpeed * grid.CellSize * Time.deltaTime;
-            Vector3 newPosition = Vector3.MoveTowards(transform.position, target, step);
-            transform.position = newPosition;
+            // Move in grid units (moveSpeed is in cells per second), then show the result.
+            Vector2 target = path[targetIndex];
+            gridPosition = Vector2.MoveTowards(gridPosition, target, data.moveSpeed * Time.deltaTime);
+            transform.position = grid.GridToWorld(gridPosition);
 
-            if ((newPosition - target).sqrMagnitude < 0.000001f)
+            if ((gridPosition - target).sqrMagnitude < 0.000001f)
                 targetIndex++;
         }
 

@@ -24,7 +24,7 @@ namespace TowerDefense
                 Enemy enemy = inRange[i];
                 if (enemy == null || enemy.IsDead) continue;
 
-                float sqrDistance = ((Vector2)enemy.transform.position - towerPosition).sqrMagnitude;
+                float sqrDistance = (enemy.GridPosition - towerPosition).sqrMagnitude; // Grid units.
                 float score = Score(enemy, sqrDistance);
 
                 bool better = score > bestScore + TieEpsilon;

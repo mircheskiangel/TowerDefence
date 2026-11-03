@@ -4,15 +4,16 @@ using UnityEngine;
 
 namespace TowerDefense
 {
-    // Owns the logical cell grid of the level: size, cell <-> world conversion,
-    // which cells are blocked (by towers), and the spawn/goal cells.
-    // Other systems (pathfinding, tower placement) query this instead of the scene.
+    // Owns the logical cell grid of the level: size, which cells are blocked (by towers),
+    // the spawn/goal cells, and the ONLY projection between grid and world coordinates.
+    // Gameplay works in grid coordinates; every grid <-> world conversion goes through here.
     public class GridManager : MonoBehaviour
     {
         public static GridManager Instance { get; private set; }
 
         [SerializeField] private int width = 16;
         [SerializeField] private int height = 10;
+        [Tooltip("World size of one cell (used by the projection and to size sprites).")]
         [SerializeField] private float cellSize = 1f;
         [Tooltip("World position of the bottom-left corner of cell (0,0).")]
         [SerializeField] private Vector2 origin = Vector2.zero;
@@ -21,6 +22,7 @@ namespace TowerDefense
         [SerializeField] private bool drawDebugGrid = true;
 
         private bool[,] blocked;
+        private IGridProjection projection;
 
         // Raised whenever a cell changes between walkable and blocked.
         public event Action GridChanged;
@@ -28,12 +30,11 @@ namespace TowerDefense
         public int Width => width;
         public int Height => height;
         public float CellSize => cellSize;
-        public Vector2 Origin => origin;
         public Vector2Int SpawnCell => spawnCell;
         public Vector2Int GoalCell => goalCell;
 
-        // World-space center of the whole grid (used by the camera).
-        public Vector3 Center => new Vector3(origin.x + width * cellSize * 0.5f, origin.y + height * cellSize * 0.5f, 0f);
+        // Created on first use, so it also works in edit mode (LevelBuilder) where Awake does not run.
+        public IGridProjection Projection => projection ??= new TopDownProjection(origin, cellSize);
 
         private void Awake()
         {
@@ -41,11 +42,17 @@ namespace TowerDefense
             // and it must never cause the new level's grid to be destroyed instead.
             Instance = this;
             blocked = new bool[width, height];
+            projection = null;
         }
 
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
+        }
+
+        private void OnValidate()
+        {
+            projection = null; // Origin or cell size changed in the Inspector.
         }
 
         // Used by the editor LevelBuilder to set up the grid.
@@ -58,7 +65,10 @@ namespace TowerDefense
             spawnCell = spawn;
             goalCell = goal;
             blocked = new bool[width, height];
+            projection = null;
         }
+
+        // ------------------------------------------------------------- Cell state
 
         public bool IsInBounds(Vector2Int cell)
         {
@@ -109,21 +119,58 @@ namespace TowerDefense
             if (changed) GridChanged?.Invoke();
         }
 
-        // Center of a cell in world space.
+        // ------------------------------------------------------------- Conversions
+        // Grid positions are continuous: integer values are cell centers (see IGridProjection).
+
+        // World position of a cell's center.
         public Vector3 CellToWorld(Vector2Int cell)
         {
-            return new Vector3(
-                origin.x + (cell.x + 0.5f) * cellSize,
-                origin.y + (cell.y + 0.5f) * cellSize,
-                0f);
+            return Projection.CellToWorld(cell);
+        }
+
+        // World position of a continuous grid position (e.g. an enemy between two cells).
+        public Vector3 GridToWorld(Vector2 gridPosition)
+        {
+            return Projection.CellToWorld(gridPosition);
+        }
+
+        // Continuous grid position of a world point.
+        public Vector2 WorldToGrid(Vector3 world)
+        {
+            return Projection.WorldToCell(world);
         }
 
         // Cell containing a world position (may be out of bounds; check IsInBounds).
         public Vector2Int WorldToCell(Vector3 world)
         {
+            return CellAt(WorldToGrid(world));
+        }
+
+        // Cell containing a continuous grid position: cell (x, y) covers [x - 0.5, x + 0.5).
+        public static Vector2Int CellAt(Vector2 gridPosition)
+        {
             return new Vector2Int(
-                Mathf.FloorToInt((world.x - origin.x) / cellSize),
-                Mathf.FloorToInt((world.y - origin.y) / cellSize));
+                Mathf.FloorToInt(gridPosition.x + 0.5f),
+                Mathf.FloorToInt(gridPosition.y + 0.5f));
+        }
+
+        // Draw-order key for something standing at a grid position (higher = in front).
+        public float SortKey(Vector2 gridPosition)
+        {
+            return Projection.SortKey(gridPosition);
+        }
+
+        // World-space bounding box of the whole grid (used by the camera).
+        public Bounds WorldBounds
+        {
+            get
+            {
+                Bounds bounds = new Bounds(GridToWorld(new Vector2(-0.5f, -0.5f)), Vector3.zero);
+                bounds.Encapsulate(GridToWorld(new Vector2(width - 0.5f, -0.5f)));
+                bounds.Encapsulate(GridToWorld(new Vector2(-0.5f, height - 0.5f)));
+                bounds.Encapsulate(GridToWorld(new Vector2(width - 0.5f, height - 0.5f)));
+                return bounds;
+            }
         }
 
         private void EnsureArray()
@@ -139,15 +186,9 @@ namespace TowerDefense
 
             Gizmos.color = new Color(1f, 1f, 1f, 0.25f);
             for (int x = 0; x <= width; x++)
-            {
-                Vector3 a = new Vector3(origin.x + x * cellSize, origin.y, 0f);
-                Gizmos.DrawLine(a, a + Vector3.up * height * cellSize);
-            }
+                Gizmos.DrawLine(GridToWorld(new Vector2(x - 0.5f, -0.5f)), GridToWorld(new Vector2(x - 0.5f, height - 0.5f)));
             for (int y = 0; y <= height; y++)
-            {
-                Vector3 a = new Vector3(origin.x, origin.y + y * cellSize, 0f);
-                Gizmos.DrawLine(a, a + Vector3.right * width * cellSize);
-            }
+                Gizmos.DrawLine(GridToWorld(new Vector2(-0.5f, y - 0.5f)), GridToWorld(new Vector2(width - 0.5f, y - 0.5f)));
 
             Vector3 size = Vector3.one * cellSize * 0.9f;
             if (blocked != null && blocked.GetLength(0) == width && blocked.GetLength(1) == height)

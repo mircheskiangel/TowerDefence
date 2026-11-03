@@ -172,7 +172,7 @@ namespace TowerDefense
             if (!resources.TrySpend(towerData.cost)) return false;
 
             Tower tower = Instantiate(towerPrefab, grid.CellToWorld(cell), Quaternion.identity, container);
-            tower.Initialize(towerData, cell);
+            tower.Initialize(towerData, cell, grid);
             towers[cell] = tower;
 
             // The real change: raises GridChanged -> every enemy and the path view re-path.
@@ -186,7 +186,8 @@ namespace TowerDefense
         {
             rangeCircle.enabled = true;
             rangeCircle.transform.position = grid.CellToWorld(cell);
-            rangeCircle.transform.localScale = Vector3.one * range * 2f; // Sprite is 1 unit wide: diameter = 2 * range.
+            // Visual only. The sprite is 1 world unit wide; range is in cells, so diameter = 2 * range * cell size.
+            rangeCircle.transform.localScale = Vector3.one * (range * 2f * grid.CellSize);
         }
 
         private void HideHover()

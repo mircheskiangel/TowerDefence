@@ -34,15 +34,16 @@ namespace TowerDefense
             if (grid == null) return;
             if (cam == null) cam = GetComponent<Camera>();
 
-            float gridWidth = grid.Width * grid.CellSize + margin * 2f;
-            float gridHeight = grid.Height * grid.CellSize + margin * 2f;
+            Bounds bounds = grid.WorldBounds; // The grid as the projection draws it.
+            float gridWidth = bounds.size.x + margin * 2f;
+            float gridHeight = bounds.size.y + margin * 2f;
 
             // Orthographic size is half the visible height; widen it if the window is too narrow.
             float sizeForHeight = gridHeight * 0.5f;
             float sizeForWidth = gridWidth * 0.5f / Mathf.Max(cam.aspect, 0.01f);
             cam.orthographicSize = Mathf.Max(sizeForHeight, sizeForWidth);
 
-            Vector3 center = grid.Center;
+            Vector3 center = bounds.center;
             transform.position = new Vector3(center.x, center.y, -10f);
         }
     }

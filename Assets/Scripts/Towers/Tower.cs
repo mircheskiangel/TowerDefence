@@ -6,6 +6,7 @@ namespace TowerDefense
     // A placed tower. Every scanInterval seconds it collects the enemies within its range
     // and asks the selector for the current global TargetingMode which one to target.
     // It fires a projectile at that target whenever its cooldown (1 / fireRate) is over.
+    // Range checks use grid coordinates (the tower's Cell vs. Enemy.GridPosition), never world distances.
     public class Tower : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer body;
@@ -23,6 +24,8 @@ namespace TowerDefense
         private Vector3 baseScale = Vector3.one;
         private float kickTimeLeft;
 
+        private GridManager grid;
+
         public TowerSO Data { get; private set; }
         public Vector2Int Cell { get; private set; }
 
@@ -30,10 +33,11 @@ namespace TowerDefense
         // enemy compare equal to null, so a dead target is never returned.
         public Enemy CurrentTarget => currentTarget != null && !currentTarget.IsDead ? currentTarget : null;
 
-        public void Initialize(TowerSO data, Vector2Int cell)
+        public void Initialize(TowerSO data, Vector2Int cell, GridManager gridManager)
         {
             Data = data;
             Cell = cell;
+            grid = gridManager != null ? gridManager : GridManager.Instance;
             name = $"{data.displayName} ({cell.x},{cell.y})";
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
@@ -93,7 +97,7 @@ namespace TowerDefense
             if (target == null) return;
 
             Projectile projectile = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
-            projectile.Initialize(target, Data.damage, Data.projectileSpeed);
+            projectile.Initialize(target, Data.damage, Data.projectileSpeed, grid, Cell);
             fireCooldown = 1f / Data.fireRate;
 
             transform.localScale = baseScale * fireKickScale; // Visual only.
@@ -106,7 +110,7 @@ namespace TowerDefense
         {
             if (Data == null) return;
 
-            Vector2 position = transform.position;
+            Vector2 position = Cell; // Grid coordinates; Data.range is in cells.
             float rangeSqr = Data.range * Data.range;
             IReadOnlyList<Enemy> enemies = EnemyRegistry.Active;
 
@@ -115,7 +119,7 @@ namespace TowerDefense
             {
                 Enemy enemy = enemies[i];
                 if (enemy == null || enemy.IsDead || enemy.Data == null) continue;
-                if (((Vector2)enemy.transform.position - position).sqrMagnitude <= rangeSqr)
+                if ((enemy.GridPosition - position).sqrMagnitude <= rangeSqr)
                     inRange.Add(enemy);
             }
 
