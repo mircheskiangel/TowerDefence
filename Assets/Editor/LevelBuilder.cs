@@ -38,6 +38,10 @@ namespace TowerDefense.EditorTools
         private const float CellSize = 1f;
         private static readonly Vector2Int SpawnCell = new Vector2Int(0, 5);
         private static readonly Vector2Int GoalCell = new Vector2Int(15, 4);
+        // Isometric island: one ring of decorative (non-playable) cells around the board.
+        private const int RingWidth = 1;
+        private static readonly Color RingTint = new Color(0.88f, 0.88f, 0.88f);
+        private const int DecorSeed = 11;
         // How the board is drawn when the level starts (V switches at runtime).
         private const GridProjectionType DefaultStartProjection = GridProjectionType.Isometric;
 
@@ -59,6 +63,9 @@ namespace TowerDefense.EditorTools
         // --- Sorting orders (higher draws on top) ---
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
+        public const int OrderRoad = 1;      // Isometric dirt road over the grass tiles.
+        public const int OrderCliffs = -1;   // Isometric cliff faces, just under the tiles.
+        public const int OrderBackdrop = -100;
         public const int OrderRange = 3;
         public const int OrderTowers = 5;
         public const int OrderEnemies = 10;
@@ -137,7 +144,8 @@ namespace TowerDefense.EditorTools
             BuildCamera(grid);
 
             // 5. Pathfinding debug (path line, P toggles)
-            BuildPathDebug(grid, spriteMaterial);
+            PathDebugView pathView = BuildPathDebug(grid, spriteMaterial);
+            BuildRoad(grid, pathView, skin, spriteMaterial);
 
             // Prefabs are re-loaded here: opening a new scene can unload assets created before it,
             // which would leave a dead reference and an empty field in the saved scene.
@@ -183,6 +191,11 @@ namespace TowerDefense.EditorTools
             SetField(board, "goalColor", GoalColor);
             SetField(board, "tileSortingOrder", OrderTiles);
             SetField(board, "markerSortingOrder", OrderMarkers);
+            SetField(board, "ringWidth", RingWidth);
+            SetField(board, "ringTint", RingTint);
+            SetField(board, "cliffSortingOrder", OrderCliffs);
+            SetField(board, "backgroundSortingOrder", OrderBackdrop);
+            SetDecorations(board, PlaceDecorations(grid));
             board.Rebuild();
         }
 
@@ -200,16 +213,89 @@ namespace TowerDefense.EditorTools
 
             CameraFitter fitter = camGo.AddComponent<CameraFitter>();
             fitter.SetGrid(grid);
+            SetField(fitter, "isometricRing", (float)RingWidth);
+            SetField(fitter, "isometricCliff", IsoArt.CliffWorldHeight);
             fitter.Fit();
         }
 
-        private static void BuildPathDebug(GridManager grid, Material material)
+        private static PathDebugView BuildPathDebug(GridManager grid, Material material)
         {
             GameObject debugGo = new GameObject("PathDebug");
             PathDebugView view = debugGo.AddComponent<PathDebugView>();
             SetField(view, "grid", grid);
             SetField(view, "lineMaterial", material);
             SetField(view, "sortingOrder", OrderPathLine);
+            return view;
+        }
+
+        // Isometric dirt road on the current path (same object as the path line, so it reads the
+        // same CurrentPath). The ring cells in front of the portal and gate are always road.
+        private static void BuildRoad(GridManager grid, PathDebugView pathView, SkinSet skin, Material material)
+        {
+            RoadView road = pathView.gameObject.AddComponent<RoadView>();
+            SetField(road, "grid", grid);
+            SetField(road, "pathView", pathView);
+            SetField(road, "skin", skin);
+            SetField(road, "material", material);
+            SetField(road, "sortingOrder", OrderRoad);
+            SerializedObject so = new SerializedObject(road);
+            SerializedProperty cells = so.FindProperty("extraCells");
+            cells.arraySize = 2;
+            cells.GetArrayElementAtIndex(0).vector2IntValue = BoardView.OutsideNeighbour(grid, grid.SpawnCell);
+            cells.GetArrayElementAtIndex(1).vector2IntValue = BoardView.OutsideNeighbour(grid, grid.GoalCell);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // Trees, rocks and bushes on the decorative ring, placed with a fixed seed. Never on the
+        // portal/gate cells or the ring cells next to them; the two front edges (lower-left
+        // column x = -1 and lower-right row y = -1) get only low rocks and bushes, so nothing
+        // hides the front row of the board.
+        private static List<BoardView.Decoration> PlaceDecorations(GridManager grid)
+        {
+            var list = new List<BoardView.Decoration>();
+            System.Random rng = PixelArt.Rng(DecorSeed);
+            Vector2Int portal = BoardView.OutsideNeighbour(grid, grid.SpawnCell);
+            Vector2Int gate = BoardView.OutsideNeighbour(grid, grid.GoalCell);
+            for (int x = -RingWidth; x < grid.Width + RingWidth; x++)
+            {
+                for (int y = -RingWidth; y < grid.Height + RingWidth; y++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    if (grid.IsInBounds(cell)) continue;
+                    double r = rng.NextDouble();
+                    Vector2 offset = new Vector2((float)(rng.NextDouble() - 0.5) * 0.4f, (float)(rng.NextDouble() - 0.5) * 0.4f);
+                    if (Chebyshev(cell, portal) <= 1 || Chebyshev(cell, gate) <= 1) continue;
+                    bool front = x < 0 || y < 0;
+                    SkinSlot slot;
+                    if (!front && r < 0.50) slot = SkinSlot.Tree;
+                    else if (r < 0.66) slot = SkinSlot.Rock;
+                    else if (r < 0.80) slot = SkinSlot.Bush;
+                    else continue;
+                    int variants = slot == SkinSlot.Tree ? IsoArt.TreeVariants : slot == SkinSlot.Rock ? IsoArt.RockVariants : IsoArt.BushVariants;
+                    list.Add(new BoardView.Decoration { slot = slot, variant = rng.Next(variants), gridPosition = cell + offset });
+                }
+            }
+            return list;
+        }
+
+        private static int Chebyshev(Vector2Int a, Vector2Int b)
+        {
+            return Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
+        }
+
+        private static void SetDecorations(BoardView board, List<BoardView.Decoration> list)
+        {
+            SerializedObject so = new SerializedObject(board);
+            SerializedProperty prop = so.FindProperty("decorations");
+            prop.arraySize = list.Count;
+            for (int i = 0; i < list.Count; i++)
+            {
+                SerializedProperty e = prop.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("slot").intValue = (int)list[i].slot;
+                e.FindPropertyRelative("variant").intValue = list[i].variant;
+                e.FindPropertyRelative("gridPosition").vector2Value = list[i].gridPosition;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // PlayerResources plus the LivesHandler that takes a life per enemy reaching the goal.
@@ -958,12 +1044,16 @@ namespace TowerDefense.EditorTools
             return false;
         }
 
-        // The isometric skin asset (same GUID on every rebuild), filled from the generated PNGs
-        // that exist. With no PNGs every slot stays empty and the level looks as before.
+        // The isometric skin asset (same GUID on every rebuild): the terrain art is generated
+        // (IsoArt) and every slot whose PNG exists is filled. Empty slots keep the M7 look.
         private static SkinSet CreateSkin()
         {
+            IsoArt.GenerateAll(); // Isometric terrain PNGs (fixed seed: identical files on every build).
             SkinSet skin = SkinLoader.LoadOrCreate(SkinPath);
             int filled = SkinLoader.Fill(skin);
+            int period = IsoArt.GrassPeriod;
+            skin.grassPeriod = skin.grassTiles.Length == period * period ? period : 0;
+            EditorUtility.SetDirty(skin);
             Debug.Log($"[LevelBuilder] Skin {SkinPath}: {filled} sprite(s) from {PixelArt.GeneratedFolder}.");
             return skin;
         }

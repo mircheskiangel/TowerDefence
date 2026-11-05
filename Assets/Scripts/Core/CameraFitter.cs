@@ -16,6 +16,10 @@ namespace TowerDefense
         [SerializeField] private float orthographicSize = 6f;
         [Tooltip("Isometric only: extra world units above the board, so standing units and their health bars on the back row are not cut off.")]
         [SerializeField] private float isometricHeadroom = 0.75f;
+        [Tooltip("Isometric only: cells of decorative ring around the board that must be visible (scenery, not gameplay).")]
+        [SerializeField] private float isometricRing = 0f;
+        [Tooltip("Isometric only: height of the cliff faces under the front edges (world units).")]
+        [SerializeField] private float isometricCliff = 0f;
 
         private Camera cam;
 
@@ -42,7 +46,18 @@ namespace TowerDefense
 
             Bounds bounds = grid.WorldBounds; // The grid as the projection draws it.
             if (grid.ProjectionType == GridProjectionType.Isometric)
+            {
+                // Framing only: the island (board + ring + cliff). Gameplay keeps grid.WorldBounds.
+                float r = isometricRing;
+                Vector2[] corners =
+                {
+                    new Vector2(-0.5f - r, -0.5f - r), new Vector2(grid.Width - 0.5f + r, -0.5f - r),
+                    new Vector2(-0.5f - r, grid.Height - 0.5f + r), new Vector2(grid.Width - 0.5f + r, grid.Height - 0.5f + r),
+                };
+                foreach (Vector2 c in corners) bounds.Encapsulate(grid.GridToWorld(c));
+                bounds.Encapsulate(new Vector3(bounds.center.x, bounds.min.y - isometricCliff, 0f));
                 bounds.Encapsulate(new Vector3(bounds.center.x, bounds.max.y + isometricHeadroom, 0f));
+            }
             float gridWidth = bounds.size.x + margin * 2f;
             float gridHeight = bounds.size.y + margin * 2f;
 

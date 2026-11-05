@@ -6,13 +6,33 @@ namespace TowerDefense
     // the current projection: square tiles in top-down, diamond tiles in isometric. LevelBuilder
     // calls Rebuild() once in edit mode; at runtime it rebuilds itself when the projection is
     // switched. Tiles are sized from GridManager.CellFootprint, so no square-cell assumption.
-    // In isometric, filled SkinSet slots replace the tile (GrassTile variants, picked per cell)
-    // and the spawn/goal markers (SpawnPortal / GoalGate); skinned sprites are drawn untinted.
+    //
+    // Isometric with a SkinSet (grass tiles filled) draws the island instead:
+    // - grass tiles on the board AND on a decorative ring of 'ringWidth' cells around it
+    //   (ring tiles tinted a little darker). The ring is scenery only: it is not part of the
+    //   grid, so it is never clickable, walkable or blocked and A* never sees it;
+    // - cliff faces under the front edges (CliffLeft under column -ring, CliffRight under row -ring);
+    // - a full-screen backdrop (Background slot);
+    // - decoration (trees, rocks, bushes) from the serialized list, depth sorted like units;
+    // - a standing spawn portal and goal gate on the ring cells beside spawn and goal, depth
+    //   sorted like units (they replace the flat markers).
+    // Every slot is optional; an empty slot falls back to the M7 look for that part.
     public class BoardView : MonoBehaviour
     {
         private const string TilesName = "Tiles";
         private const string SpawnName = "SpawnMarker";
         private const string GoalName = "GoalMarker";
+        private const string CliffsName = "Cliffs";
+        private const string DecorName = "Decor";
+        private const string BackgroundName = "Background";
+
+        [System.Serializable]
+        public struct Decoration
+        {
+            public SkinSlot slot;          // Tree, Rock or Bush
+            public int variant;
+            public Vector2 gridPosition;   // On a ring cell; also its draw-order position.
+        }
 
         [SerializeField] private GridManager grid;
         [SerializeField] private Sprite squareSprite;
@@ -27,6 +47,16 @@ namespace TowerDefense
         [SerializeField] private int markerSortingOrder = 1;
         [SerializeField] private float markerScale = 0.9f;
 
+        [Header("Isometric island (skin only)")]
+        [Tooltip("Cells of decorative terrain around the board (scenery, not part of the grid).")]
+        [SerializeField] private int ringWidth = 1;
+        [SerializeField] private Color ringTint = new Color(0.88f, 0.88f, 0.88f);
+        [SerializeField] private int cliffSortingOrder = -1;
+        [SerializeField] private int backgroundSortingOrder = -100;
+        [Tooltip("World size the backdrop covers (centered on the board).")]
+        [SerializeField] private Vector2 backgroundCover = new Vector2(40f, 26f);
+        [SerializeField] private Decoration[] decorations = new Decoration[0];
+
         private void OnEnable()
         {
             if (grid != null) grid.ProjectionChanged += Rebuild;
@@ -37,36 +67,52 @@ namespace TowerDefense
             if (grid != null) grid.ProjectionChanged -= Rebuild;
         }
 
+        // Ring cell just outside the board next to 'cell' (spawn and goal lie on the board edge).
+        public static Vector2Int OutsideNeighbour(GridManager grid, Vector2Int cell)
+        {
+            if (cell.x == 0) return cell + Vector2Int.left;
+            if (cell.x == grid.Width - 1) return cell + Vector2Int.right;
+            if (cell.y == 0) return cell + Vector2Int.down;
+            return cell + Vector2Int.up;
+        }
+
         public void Rebuild()
         {
             if (grid == null) return;
-            RemoveChild(TilesName);
-            RemoveChild(SpawnName);
-            RemoveChild(GoalName);
+            foreach (string child in new[] { TilesName, SpawnName, GoalName, CliffsName, DecorName, BackgroundName })
+                RemoveChild(child);
 
             bool iso = grid.ProjectionType == GridProjectionType.Isometric;
             Sprite sprite = iso ? diamondSprite : squareSprite;
             Vector3 tileScale = ScaleFor(sprite, 1f);
-            bool skinnedTiles = iso && skin != null && skin.Has(SkinSlot.GrassTile);
+            bool island = iso && skin != null && skin.Has(SkinSlot.GrassTile);
+            int ring = island ? Mathf.Max(0, ringWidth) : 0;
 
             Transform tiles = new GameObject(TilesName).transform;
             tiles.SetParent(transform, false);
-            for (int x = 0; x < grid.Width; x++)
+            for (int x = -ring; x < grid.Width + ring; x++)
             {
-                for (int y = 0; y < grid.Height; y++)
+                for (int y = -ring; y < grid.Height + ring; y++)
                 {
                     Color color = (x + y) % 2 == 0 ? tileColorA : tileColorB;
                     Sprite tileSprite = sprite;
                     Vector3 scale = tileScale;
-                    if (skinnedTiles)
+                    if (island)
                     {
-                        tileSprite = skin.Get(SkinSlot.GrassTile, VariantFor(x, y));
+                        tileSprite = skin.Get(SkinSlot.GrassTile, skin.GrassVariantFor(x, y));
                         scale = ScaleFor(tileSprite, 1f);
-                        color = Color.white;
+                        color = grid.IsInBounds(new Vector2Int(x, y)) ? Color.white : ringTint;
                     }
                     CreateSprite($"Tile_{x}_{y}", tiles, tileSprite, color, tileSortingOrder,
                         grid.CellToWorld(new Vector2Int(x, y)), scale);
                 }
+            }
+
+            if (island)
+            {
+                BuildCliffs(ring);
+                BuildBackground();
+                BuildDecor();
             }
 
             Vector3 markerSize = ScaleFor(sprite, markerScale);
@@ -74,21 +120,69 @@ namespace TowerDefense
             CreateMarker(GoalName, iso ? SkinSlot.GoalGate : SkinSlot.None, sprite, goalColor, grid.GoalCell, markerSize);
         }
 
-        // A filled skin slot is a standing object drawn at its native size (1 pixel = 1/64 unit,
-        // pivot at its feet); otherwise the plain tinted tile marker.
+        // Earth faces under the two front edges of the island: the lower-left side is the column
+        // x = -ring (CliffLeft), the lower-right side is the row y = -ring (CliffRight).
+        private void BuildCliffs(int ring)
+        {
+            Transform cliffs = new GameObject(CliffsName).transform;
+            cliffs.SetParent(transform, false);
+            int front = -ring;
+            for (int y = front; y < grid.Height + ring; y++)
+                CreateSkinned($"CliffLeft_{y}", cliffs, SkinSlot.CliffLeft, 0, cliffSortingOrder, grid.CellToWorld(new Vector2Int(front, y)));
+            for (int x = front; x < grid.Width + ring; x++)
+                CreateSkinned($"CliffRight_{x}", cliffs, SkinSlot.CliffRight, 0, cliffSortingOrder, grid.CellToWorld(new Vector2Int(x, front)));
+        }
+
+        private void BuildBackground()
+        {
+            Sprite backdrop = skin.Get(SkinSlot.Background);
+            if (backdrop == null) return;
+            Vector2 size = backdrop.bounds.size;
+            float scale = Mathf.Max(backgroundCover.x / size.x, backgroundCover.y / size.y);
+            Vector3 center = grid.WorldBounds.center;
+            CreateSprite(BackgroundName, transform, backdrop, Color.white, backgroundSortingOrder,
+                new Vector3(center.x, center.y, 0f), Vector3.one * scale);
+        }
+
+        // Trees, rocks and bushes on ring cells; sorted by depth like towers and enemies.
+        private void BuildDecor()
+        {
+            Transform decor = new GameObject(DecorName).transform;
+            decor.SetParent(transform, false);
+            for (int i = 0; i < decorations.Length; i++)
+            {
+                Decoration d = decorations[i];
+                Sprite s = skin.Get(d.slot, d.variant);
+                if (s == null) continue;
+                CreateStanding($"{d.slot}_{i}", decor, s, d.gridPosition);
+            }
+        }
+
+        // In isometric a filled portal/gate slot is a standing object on the ring cell beside the
+        // spawn/goal, depth sorted; otherwise the plain tinted tile marker on the cell itself.
         private void CreateMarker(string objectName, SkinSlot slot, Sprite plain, Color color, Vector2Int cell, Vector3 plainScale)
         {
-            Sprite skinned = skin != null && slot != SkinSlot.None ? skin.Get(slot) : null;
-            if (skinned != null)
-                CreateSprite(objectName, transform, skinned, Color.white, markerSortingOrder, grid.CellToWorld(cell), Vector3.one * grid.CellSize);
+            Sprite standing = skin != null && slot != SkinSlot.None ? skin.Get(slot) : null;
+            if (standing != null)
+                CreateStanding(objectName, transform, standing, OutsideNeighbour(grid, cell));
             else
                 CreateSprite(objectName, transform, plain, color, markerSortingOrder, grid.CellToWorld(cell), plainScale);
         }
 
-        // Fixed per-cell variant index, so a rebuild always gives the same tile pattern.
-        private static int VariantFor(int x, int y)
+        // Standing sprite (pivot at its feet, native size) with a DepthSorter at 'gridPosition'.
+        private void CreateStanding(string objectName, Transform parent, Sprite sprite, Vector2 gridPosition)
         {
-            return ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff;
+            SpriteRenderer sr = CreateSprite(objectName, parent, sprite, Color.white, markerSortingOrder,
+                grid.GridToWorld(gridPosition), Vector3.one * grid.CellSize);
+            DepthSorter depth = sr.gameObject.AddComponent<DepthSorter>();
+            depth.Configure(new Renderer[] { sr }, new[] { DepthSorter.PartBody });
+            depth.Initialize(grid, gridPosition);
+        }
+
+        private void CreateSkinned(string objectName, Transform parent, SkinSlot slot, int variant, int order, Vector3 position)
+        {
+            Sprite s = skin.Get(slot, variant);
+            if (s != null) CreateSprite(objectName, parent, s, Color.white, order, position, Vector3.one * grid.CellSize);
         }
 
         // Scale that makes 'sprite' cover one cell's footprint (times 'fraction').
@@ -99,7 +193,7 @@ namespace TowerDefense
             return new Vector3(footprint.x / spriteSize.x * fraction, footprint.y / spriteSize.y * fraction, fraction);
         }
 
-        private void CreateSprite(string objectName, Transform parent, Sprite sprite, Color color, int order, Vector3 position, Vector3 scale)
+        private SpriteRenderer CreateSprite(string objectName, Transform parent, Sprite sprite, Color color, int order, Vector3 position, Vector3 scale)
         {
             GameObject go = new GameObject(objectName);
             go.transform.SetParent(parent, false);
@@ -110,6 +204,7 @@ namespace TowerDefense
             sr.sharedMaterial = material;
             sr.color = color;
             sr.sortingOrder = order;
+            return sr;
         }
 
         private void RemoveChild(string childName)

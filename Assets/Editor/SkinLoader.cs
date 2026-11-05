@@ -9,7 +9,7 @@ namespace TowerDefense.EditorTools
     // keeps its built-in sprite. File names (variant slots count up from 0 until a gap):
     //   Grass_0.png, Grass_1.png, ...   Path_0..   Tree_0..   Rock_0..   Bush_0..
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
-    //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton
+    //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background
     public static class SkinLoader
     {
         // Loads the SkinSet at 'path', or creates it (an existing asset keeps its GUID).
@@ -47,6 +47,7 @@ namespace TowerDefense.EditorTools
                 skin.projectile = Load(folder, "Projectile", ref count);
                 skin.hudPanel = Load(folder, "HudPanel", ref count);
                 skin.hudButton = Load(folder, "HudButton", ref count);
+                skin.background = Load(folder, "Background", ref count);
             }
             EditorUtility.SetDirty(skin);
             return count;

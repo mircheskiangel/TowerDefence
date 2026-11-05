@@ -12,6 +12,8 @@ namespace TowerDefense
     {
         [Header("Floor")]
         public Sprite[] grassTiles = new Sprite[0];
+        [Tooltip("Grass tiles repeat every N cells in x and y (variant = x mod N + N * (y mod N)), so their noise joins seamlessly. 0 = pick variants by hash.")]
+        public int grassPeriod;
         public Sprite[] pathTiles = new Sprite[0];
         public Sprite cliffLeft;
         public Sprite cliffRight;
@@ -39,6 +41,9 @@ namespace TowerDefense
         public Sprite hudPanel;
         public Sprite hudButton;
 
+        [Header("Backdrop")]
+        public Sprite background;
+
         // The sprite in 'slot' (variant 'variant', wrapped for variant slots), or null if empty.
         public Sprite Get(SkinSlot slot, int variant = 0)
         {
@@ -61,6 +66,7 @@ namespace TowerDefense
                 case SkinSlot.Projectile: return projectile;
                 case SkinSlot.HudPanel: return hudPanel;
                 case SkinSlot.HudButton: return hudButton;
+                case SkinSlot.Background: return background;
                 default: return null;
             }
         }
@@ -102,7 +108,26 @@ namespace TowerDefense
             towerBody = towerBase = towerShadow = projectile = null;
             grunt = tank = null;
             hudPanel = hudButton = null;
+            background = null;
+            grassPeriod = 0;
         }
+
+        // Variant index of the grass tile for cell (x, y); ring cells (negative or past the board)
+        // work too. With grassPeriod N the tiles tile seamlessly every N cells.
+        public int GrassVariantFor(int x, int y)
+        {
+            int n = grassPeriod;
+            if (n > 0) return Mod(x, n) + n * Mod(y, n);
+            return HashVariant(x, y);
+        }
+
+        // Fixed per-cell variant index (any variant slot), so a rebuild gives the same pattern.
+        public static int HashVariant(int x, int y)
+        {
+            unchecked { return ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff; }
+        }
+
+        private static int Mod(int a, int n) => ((a % n) + n) % n;
 
         private static Sprite Pick(Sprite[] variants, int variant)
         {

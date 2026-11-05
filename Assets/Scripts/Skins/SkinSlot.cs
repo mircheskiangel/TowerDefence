@@ -22,5 +22,6 @@ namespace TowerDefense
         Projectile,
         HudPanel,
         HudButton,
+        Background,     // full-screen backdrop behind the island (isometric)
     }
 }

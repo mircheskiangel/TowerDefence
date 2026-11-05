@@ -46,6 +46,20 @@ namespace TowerDefense.EditorTools
             return Mathf.Lerp(Mathf.Lerp(a, b, tx), Mathf.Lerp(c, d, tx), ty);
         }
 
+        // ValueNoise that repeats every 'period' lattice steps in x and y, so textures generated
+        // for neighbouring tiles from the same continuous coordinates join without seams.
+        public static float PeriodicNoise(float x, float y, int period, int seed = 0)
+        {
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+            float tx = Smooth(x - x0), ty = Smooth(y - y0);
+            int xa = Wrap(x0, period), xb = Wrap(x0 + 1, period), ya = Wrap(y0, period), yb = Wrap(y0 + 1, period);
+            float a = Hash(xa, ya, seed), b = Hash(xb, ya, seed);
+            float c = Hash(xa, yb, seed), d = Hash(xb, yb, seed);
+            return Mathf.Lerp(Mathf.Lerp(a, b, tx), Mathf.Lerp(c, d, tx), ty);
+        }
+
+        public static int Wrap(int a, int n) => ((a % n) + n) % n;
+
         // Several octaves of ValueNoise (each half the size and weight of the previous), in [0, 1].
         public static float Fractal(float x, float y, int seed = 0, int octaves = 3)
         {

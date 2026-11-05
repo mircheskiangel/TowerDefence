@@ -21,6 +21,9 @@ namespace TowerDefense
 
         public List<Vector2Int> CurrentPath { get; private set; }
 
+        // Raised after every Recompute (the dirt road redraws from CurrentPath; no extra A*).
+        public event System.Action PathChanged;
+
         private void Start()
         {
             if (grid == null) grid = GridManager.Instance;
@@ -69,6 +72,7 @@ namespace TowerDefense
                           $"A* expanded {pathfinder.LastExpandedCount} cells.");
 
             RefreshLine();
+            PathChanged?.Invoke();
         }
 
         private void RefreshLine()

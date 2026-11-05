@@ -12,20 +12,48 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bc99d67af19946749ae0cf4390e64771, type: 3}
   m_Name: DefaultSkin
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.SkinSet
-  grassTiles: []
-  pathTiles: []
-  cliffLeft: {fileID: 0}
-  cliffRight: {fileID: 0}
-  spawnPortal: {fileID: 0}
-  goalGate: {fileID: 0}
+  grassTiles:
+  - {fileID: 21300000, guid: fced86bc06d433344a15cc20ee558da8, type: 3}
+  - {fileID: 21300000, guid: 3a77ccdd9254f9e4693ac9d791286214, type: 3}
+  - {fileID: 21300000, guid: 82c97b0abffb3a3418eb9e1502962775, type: 3}
+  - {fileID: 21300000, guid: 3211027af44d1ff46952860d01b7e4e3, type: 3}
+  - {fileID: 21300000, guid: 61dde2150cb024045af1fa0349c12819, type: 3}
+  - {fileID: 21300000, guid: ca139f731be6ed04698e5a0ddb7dc4b0, type: 3}
+  - {fileID: 21300000, guid: 661e51ad0652f7d448943fe4185d833b, type: 3}
+  - {fileID: 21300000, guid: cbc20b64473454543ba2eb102de2bab6, type: 3}
+  - {fileID: 21300000, guid: 24bae8069d52647458c07c870bc99921, type: 3}
+  - {fileID: 21300000, guid: 8ee2e81755dbe444c9a64c8e29f2b1d0, type: 3}
+  - {fileID: 21300000, guid: 834663c321399c143ab37520cb66689b, type: 3}
+  - {fileID: 21300000, guid: aa6f5bd9c89c8c646a0d646e6dd9e2ae, type: 3}
+  - {fileID: 21300000, guid: c5927886edf579a4ba79715fdd077a25, type: 3}
+  - {fileID: 21300000, guid: 99841a4dab7a6684f83a76682327c658, type: 3}
+  - {fileID: 21300000, guid: d2d79e9dbd687e342a7b71ba39666312, type: 3}
+  - {fileID: 21300000, guid: c0ba7181a660c4044b2d7fc128cff485, type: 3}
+  grassPeriod: 4
+  pathTiles:
+  - {fileID: 21300000, guid: 680571f1dba87e14994af44bdcf0a24e, type: 3}
+  - {fileID: 21300000, guid: bdf9225bfea899c459ba701a314122e2, type: 3}
+  - {fileID: 21300000, guid: a637de6ac28f32242bfaabdcbc920126, type: 3}
+  cliffLeft: {fileID: 21300000, guid: 9c9ffe6822e9c1d44a3dcf0e92575e53, type: 3}
+  cliffRight: {fileID: 21300000, guid: 9aa0b84bb1a1ce6419edcb1b2a92a1ff, type: 3}
+  spawnPortal: {fileID: 21300000, guid: 989ea6fa948f3884d808f9af501f8aed, type: 3}
+  goalGate: {fileID: 21300000, guid: 76d0e050a00b92748930e07f44f4bf5a, type: 3}
   towerBody: {fileID: 0}
   towerBase: {fileID: 0}
   towerShadow: {fileID: 0}
   projectile: {fileID: 0}
   grunt: {fileID: 0}
   tank: {fileID: 0}
-  trees: []
-  rocks: []
-  bushes: []
+  trees:
+  - {fileID: 21300000, guid: 27409e34daa0e4040abb57ca35da2283, type: 3}
+  - {fileID: 21300000, guid: 18c480f2505b3d740864435a5cd54cf3, type: 3}
+  - {fileID: 21300000, guid: caac430d7cee7d54891655dd266e975c, type: 3}
+  rocks:
+  - {fileID: 21300000, guid: 67d7fad5d9bd36544884b4c1dee4af57, type: 3}
+  - {fileID: 21300000, guid: fd477e842d23e924b8d68de22ec8c70a, type: 3}
+  bushes:
+  - {fileID: 21300000, guid: 637f5f55dc35ff649a520202aee23c3e, type: 3}
+  - {fileID: 21300000, guid: 6dbd89e63b25de14ebf975bdfb5da80e, type: 3}
   hudPanel: {fileID: 0}
   hudButton: {fileID: 0}
+  background: {fileID: 21300000, guid: 119d36d4e1760654b867d2f9be0d1cf0, type: 3}
