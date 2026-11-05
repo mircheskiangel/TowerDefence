@@ -45,6 +45,7 @@ namespace TowerDefense
             name = $"{data.displayName} ({cell.x},{cell.y})";
             if (body == null) body = GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = data.color;
+            if (look != null) look.SetTint(data.color); // Top-down tint; a skinned sprite is drawn untinted.
 
             // The kick scales only the body (the square in top-down; the pillar and cap in
             // isometric), never the base plate or the ground shadow.
@@ -81,6 +82,10 @@ namespace TowerDefense
         private void ApplyView()
         {
             if (look != null) look.Apply(grid);
+            // The look may change the body's scale (native pixel size when skinned), so the kick
+            // always starts from the body's current rest scale.
+            kickTimeLeft = 0f;
+            baseScale = KickTarget.localScale;
             if (depth != null) depth.Initialize(grid, Cell);
         }
 

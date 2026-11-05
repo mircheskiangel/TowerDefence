@@ -25,6 +25,7 @@ namespace TowerDefense
         private const string CliffsName = "Cliffs";
         private const string DecorName = "Decor";
         private const string BackgroundName = "Background";
+        private const string DetailsName = "GrassDetails";
 
         [System.Serializable]
         public struct Decoration
@@ -79,7 +80,7 @@ namespace TowerDefense
         public void Rebuild()
         {
             if (grid == null) return;
-            foreach (string child in new[] { TilesName, SpawnName, GoalName, CliffsName, DecorName, BackgroundName })
+            foreach (string child in new[] { TilesName, SpawnName, GoalName, CliffsName, DecorName, BackgroundName, DetailsName })
                 RemoveChild(child);
 
             bool iso = grid.ProjectionType == GridProjectionType.Isometric;
@@ -90,6 +91,9 @@ namespace TowerDefense
 
             Transform tiles = new GameObject(TilesName).transform;
             tiles.SetParent(transform, false);
+            // Island: grass tiles one order lower, so the tuft/flower overlays (at the tile order)
+            // lie on the grass and the road (order 1) covers both.
+            int tileOrder = island ? tileSortingOrder - 1 : tileSortingOrder;
             for (int x = -ring; x < grid.Width + ring; x++)
             {
                 for (int y = -ring; y < grid.Height + ring; y++)
@@ -103,13 +107,14 @@ namespace TowerDefense
                         scale = ScaleFor(tileSprite, 1f);
                         color = grid.IsInBounds(new Vector2Int(x, y)) ? Color.white : ringTint;
                     }
-                    CreateSprite($"Tile_{x}_{y}", tiles, tileSprite, color, tileSortingOrder,
+                    CreateSprite($"Tile_{x}_{y}", tiles, tileSprite, color, tileOrder,
                         grid.CellToWorld(new Vector2Int(x, y)), scale);
                 }
             }
 
             if (island)
             {
+                BuildGrassDetails(ring);
                 BuildCliffs(ring);
                 BuildBackground();
                 BuildDecor();
@@ -118,6 +123,23 @@ namespace TowerDefense
             Vector3 markerSize = ScaleFor(sprite, markerScale);
             CreateMarker(SpawnName, iso ? SkinSlot.SpawnPortal : SkinSlot.None, sprite, spawnColor, grid.SpawnCell, markerSize);
             CreateMarker(GoalName, iso ? SkinSlot.GoalGate : SkinSlot.None, sprite, goalColor, grid.GoalCell, markerSize);
+        }
+
+        // Tufts and flowers: one overlay per cell, chosen with a well-mixed hash of the cell
+        // coordinates, so they do not repeat with the 4-cell period of the grass colour noise.
+        private void BuildGrassDetails(int ring)
+        {
+            if (!skin.Has(SkinSlot.GrassDetail)) return;
+            Transform details = new GameObject(DetailsName).transform;
+            details.SetParent(transform, false);
+            for (int x = -ring; x < grid.Width + ring; x++)
+                for (int y = -ring; y < grid.Height + ring; y++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    Color color = grid.IsInBounds(cell) ? Color.white : ringTint;
+                    CreateSprite($"Detail_{x}_{y}", details, skin.Get(SkinSlot.GrassDetail, SkinSet.MixedHash(x, y)), color,
+                        tileSortingOrder, grid.CellToWorld(cell), Vector3.one * grid.CellSize);
+                }
         }
 
         // Earth faces under the two front edges of the island: the lower-left side is the column

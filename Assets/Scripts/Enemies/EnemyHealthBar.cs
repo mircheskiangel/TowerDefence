@@ -20,6 +20,41 @@ namespace TowerDefense
         [SerializeField] private Color fullColor = new Color(0.25f, 0.9f, 0.3f);
         [SerializeField] private Color halfColor = new Color(1f, 0.85f, 0.2f);
         [SerializeField] private Color lowColor = new Color(0.95f, 0.25f, 0.2f);
+        [Header("Isometric skin (pixel bar)")]
+        [Tooltip("Tells whether the body is drawn with a skin sprite (then the pixel bar is used).")]
+        [SerializeField] private ProjectionLook look;
+        [SerializeField] private Color skinnedBorderColor = new Color(20f / 255f, 14f / 255f, 14f / 255f);
+        [SerializeField] private Color skinnedFillColor = new Color(210f / 255f, 40f / 255f, 40f / 255f);
+        [SerializeField] private float pixelsPerUnit = 64f;
+
+        private int skinnedWidthPixels = 18;
+        private float fraction = 1f;
+        private bool Skinned => look != null && look.IsSkinned;
+        // Pixel bar: fill W x 2 px inside a 1 px dark border, 3 px above the ball.
+        private Vector2 BarSize => Skinned ? new Vector2((skinnedWidthPixels + 2) / pixelsPerUnit, 4f / pixelsPerUnit) : size;
+        private Vector2 FillSize => Skinned ? new Vector2(skinnedWidthPixels / pixelsPerUnit, 2f / pixelsPerUnit) : size;
+        private float Gap => Skinned ? 3f / pixelsPerUnit : gapAboveEnemy;
+
+        // Fill width of the skinned (isometric) bar in pixels: narrower for a Grunt than a Tank.
+        public void SetSkinnedWidth(int pixels)
+        {
+            skinnedWidthPixels = Mathf.Max(4, pixels);
+        }
+
+        private Color backgroundColor;
+        private bool backgroundCaptured;
+
+        private void Awake()
+        {
+            CaptureBackground();
+        }
+
+        private void CaptureBackground()
+        {
+            if (backgroundCaptured || background == null) return;
+            backgroundColor = background.color;
+            backgroundCaptured = true;
+        }
 
         private void OnEnable()
         {
@@ -34,6 +69,7 @@ namespace TowerDefense
         // Called by Enemy.Initialize once its scale is known: lays the bar out and hides it.
         public void ResetBar()
         {
+            CaptureBackground();
             Layout();
             SetFill(1f);
             SetVisible(false);
@@ -50,27 +86,42 @@ namespace TowerDefense
 
             transform.localRotation = Quaternion.identity;
             transform.localScale = new Vector3(1f / sx, 1f / sy, 1f);
-            float top = body != null && body.sprite != null ? body.sprite.bounds.max.y : 0.5f;
-            transform.localPosition = new Vector3(0f, top + (gapAboveEnemy + size.y * 0.5f) / sy, 0f);
+            // Top of the body sprite in the enemy's local space (the body may be a scaled child;
+            // its bob offset is ignored, so the bar stays still while the ball bobs).
+            float top = 0.5f;
+            if (body != null && body.sprite != null)
+                top = body.sprite.bounds.max.y * (body.transform == transform.parent ? 1f : body.transform.localScale.y);
+            Vector2 bar = BarSize;
+            transform.localPosition = new Vector3(0f, top + (Gap + bar.y * 0.5f) / sy, 0f);
 
-            background.transform.localScale = new Vector3(size.x, size.y, 1f);
+            background.transform.localScale = new Vector3(bar.x, bar.y, 1f);
             background.transform.localPosition = Vector3.zero;
+            SetFill(fraction); // Bar style may have changed with the projection.
         }
 
         private void HandleHealthChanged(float current, float max)
         {
-            float fraction = max > 0f ? Mathf.Clamp01(current / max) : 0f;
-            SetFill(fraction);
-            SetVisible(fraction < 1f);
+            float f = max > 0f ? Mathf.Clamp01(current / max) : 0f;
+            SetFill(f);
+            SetVisible(f < 1f);
         }
 
         // Shrinks the fill from the right: the square sprite is centered, so it is moved left
         // by half of the missing width to keep its left edge in place.
-        private void SetFill(float fraction)
+        private void SetFill(float newFraction)
         {
-            float width = size.x * fraction;
-            fill.transform.localScale = new Vector3(width, size.y, 1f);
-            fill.transform.localPosition = new Vector3(-(size.x - width) * 0.5f, 0f, 0f);
+            fraction = newFraction;
+            Vector2 full = FillSize;
+            float width = full.x * fraction;
+            fill.transform.localScale = new Vector3(width, full.y, 1f);
+            fill.transform.localPosition = new Vector3(-(full.x - width) * 0.5f, 0f, 0f);
+            if (Skinned)
+            {
+                fill.color = skinnedFillColor;
+                background.color = skinnedBorderColor;
+                return;
+            }
+            background.color = backgroundColor;
             fill.color = fraction > 0.5f
                 ? Color.Lerp(halfColor, fullColor, (fraction - 0.5f) * 2f)
                 : Color.Lerp(lowColor, halfColor, fraction * 2f);

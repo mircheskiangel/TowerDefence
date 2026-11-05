@@ -17,6 +17,10 @@ namespace TowerDefense
     //   in the higher cell column (larger cx) is drawn in front, so equal-depth objects always get
     //   different, fixed orders and can never swap from frame to frame.
     // - part keeps an object's own pieces in order (shadow 0, base/body 1-2, bar back 2, bar fill 3).
+    // - Two objects in the same depth step AND the same cell column get the same order. For them a
+    //   tiny z offset (TieDepth) is the final, deterministic tie-break: Unity sorts equal orders by
+    //   distance to the camera, and the offset puts the larger cx nearer (then the smaller cy), so
+    //   such a pair can never swap from frame to frame either. In top-down z stays 0.
     // - Every unit order lies in MinOrder..MaxOrder: above the floor, road, range indicator,
     //   hover highlight and floor path line (orders 0-20), below OverlayOrder (path copy and
     //   hover outline drawn "through" units).
@@ -108,6 +112,18 @@ namespace TowerDefense
             Apply(true);
         }
 
+        // Final tie-break for equal orders (see the class comment): z in world units, |z| < 0.02.
+        public static float TieDepth(Vector2 gridPosition)
+        {
+            return -gridPosition.x * 0.001f + gridPosition.y * 0.00001f;
+        }
+
+        private void SetZ(float z)
+        {
+            Vector3 p = transform.position;
+            if (p.z != z) transform.position = new Vector3(p.x, p.y, z);
+        }
+
         private void Apply(bool force)
         {
             if (grid == null) return;
@@ -117,6 +133,7 @@ namespace TowerDefense
             {
                 if (sortedByDepth || force)
                 {
+                    SetZ(0f);
                     for (int i = 0; i < renderers.Length; i++)
                         if (renderers[i] != null) renderers[i].sortingOrder = typeOrders[i];
                     sortedByDepth = false;
@@ -125,6 +142,7 @@ namespace TowerDefense
                 return;
             }
 
+            SetZ(TieDepth(gridPosition)); // Every call: the owner re-places the transform with z = 0.
             // Safety net only: nothing in the level lies outside the covered range.
             int baseOrder = Mathf.Clamp(OrderFor(grid.SortKey(gridPosition), gridPosition, 0), MinOrder, MaxOrder - PartsPerStep + 1);
             if (!force && sortedByDepth && baseOrder == lastBase) return; // unchanged: no work

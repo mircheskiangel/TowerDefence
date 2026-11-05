@@ -64,7 +64,7 @@ namespace TowerDefense.EditorTools
         public const int OrderTiles = 0;
         public const int OrderMarkers = 1;
         public const int OrderRoad = 1;      // Isometric dirt road over the grass tiles.
-        public const int OrderCliffs = -1;   // Isometric cliff faces, just under the tiles.
+        public const int OrderCliffs = -2;   // Isometric cliff faces, under the island tiles (-1).
         public const int OrderBackdrop = -100;
         public const int OrderRange = 3;
         public const int OrderTowers = 5;
@@ -120,9 +120,9 @@ namespace TowerDefense.EditorTools
             Sprite shadow = CreateShadowSprite("Shadow");
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
-                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f, SkinSlot.Grunt);
+                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f, SkinSlot.Grunt, SkinSlot.GruntShadow, IsoArt.GruntBarPixels);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
-                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank);
+                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank, SkinSlot.TankShadow, IsoArt.TankBarPixels);
             CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial, skin);
             List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
@@ -158,7 +158,7 @@ namespace TowerDefense.EditorTools
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin);
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager);
+            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
             SetField(switcher, "grid", grid);
@@ -311,7 +311,8 @@ namespace TowerDefense.EditorTools
         }
 
         private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
-            TowerSO towerData, Sprite square, Sprite diamond, Sprite diamondOutline, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager)
+            TowerSO towerData, Sprite square, Sprite diamond, Sprite diamondOutline, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager,
+            SkinSet skin)
         {
             GameObject go = new GameObject("TowerPlacer");
             TowerPlacer placer = go.AddComponent<TowerPlacer>();
@@ -344,6 +345,17 @@ namespace TowerDefense.EditorTools
             SetField(indicator, "ringSprite", rangeRenderer);
             SetField(indicator, "material", material);
             SetField(indicator, "sortingOrder", OrderRange);
+            // Isometric ellipse style (top-down keeps the ring sprite): soft white fill, thin brighter outline.
+            SetField(indicator, "fillColor", new Color(1f, 1f, 1f, 0.13f));
+            SetField(indicator, "lineColor", new Color(1f, 1f, 1f, 0.6f));
+            SetField(indicator, "lineWidth", 0.022f);
+
+            // Isometric skin only: semi-transparent preview of the tower on a valid hovered cell.
+            GameObject preview = CreateSpriteObject("PreviewTower", square, material, Color.white, OrderTowers);
+            preview.transform.SetParent(go.transform, false);
+            preview.GetComponent<SpriteRenderer>().enabled = false;
+            SetField(placer, "previewTower", preview.GetComponent<SpriteRenderer>());
+            SetField(placer, "skin", skin);
             SetField(placer, "rangeIndicator", indicator);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
@@ -835,7 +847,7 @@ namespace TowerDefense.EditorTools
 
         // Creates the EnemySO asset, or updates it in place (same GUID) if it already exists.
         private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale,
-            SkinSlot skinSlot)
+            SkinSlot skinSlot, SkinSlot skinShadowSlot, int healthBarPixels)
         {
             string path = $"{DataFolder}/{name}.asset";
             EnemySO data = AssetDatabase.LoadAssetAtPath<EnemySO>(path);
@@ -851,6 +863,8 @@ namespace TowerDefense.EditorTools
             data.color = color;
             data.scale = scale;
             data.skinSlot = skinSlot;
+            data.skinShadowSlot = skinShadowSlot;
+            data.healthBarPixels = healthBarPixels;
             EditorUtility.SetDirty(data);
             return data;
         }
@@ -893,9 +907,13 @@ namespace TowerDefense.EditorTools
         private static void CreateEnemyPrefab(Sprite circle, Sprite square, Sprite standingCircle, Sprite shadowSprite, Material material,
             SkinSet skin)
         {
-            GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
+            // Root (logic, scaled per type at spawn) with the visual ball on a "Body" child at the
+            // root's origin, so the isometric walking bob can move the ball alone.
+            GameObject go = new GameObject("Enemy");
             Enemy enemy = go.AddComponent<Enemy>();
-            SpriteRenderer body = go.GetComponent<SpriteRenderer>();
+            GameObject bodyGo = CreateSpriteObject("Body", circle, material, Color.white, OrderEnemies);
+            bodyGo.transform.SetParent(go.transform, false);
+            SpriteRenderer body = bodyGo.GetComponent<SpriteRenderer>();
             SetField(enemy, "body", body);
 
             // Isometric only: a soft 2:1 ground shadow under the feet (hidden in top-down).
@@ -903,6 +921,7 @@ namespace TowerDefense.EditorTools
             shadow.transform.SetParent(go.transform, false);
             shadow.transform.localScale = Vector3.one * 1.15f;
             shadow.SetActive(false);
+            SkinnedSprite shadowSkin = AddSkinnedSprite(shadow, SkinSlot.GruntShadow, skin, untinted: true, nativeSize: true);
 
             // Visuals: hit flash on the body, and a world-space health bar child (no Canvas).
             EnemyHitFlash flash = go.AddComponent<EnemyHitFlash>();
@@ -931,6 +950,13 @@ namespace TowerDefense.EditorTools
             SetArray(look, "isometricOnly", new Object[] { shadow });
             SetField(look, "skin", skin);
             SetField(look, "isometricSlot", SkinSlot.Grunt); // Set per enemy type at spawn (EnemySO.skinSlot).
+            SetField(look, "nativeSizeWhenSkinned", true);
+            SetArray(look, "skinned", new Object[] { shadowSkin });
+            SetField(healthBar, "look", look);
+            SetField(enemy, "shadowSkin", shadowSkin);
+            EnemyBob bob = go.AddComponent<EnemyBob>();
+            SetField(bob, "enemy", enemy);
+            SetField(bob, "ball", bodyGo.transform);
 
             // Isometric draw order: shadow < body < bar background < bar fill, all by depth.
             DepthSorter depth = go.AddComponent<DepthSorter>();
@@ -1000,10 +1026,12 @@ namespace TowerDefense.EditorTools
             SetArray(look, "isometricOnly", new Object[] { baseGo, shadowGo });
             SetField(look, "skin", skin);
             SetField(look, "isometricSlot", SkinSlot.TowerBody);
+            SetField(look, "nativeSizeWhenSkinned", true);
+            SetArray(look, "hideWhenSkinned", new Object[] { baseGo }); // The skinned tower has its own stone base.
             SetArray(look, "skinned", new Object[]
             {
                 AddSkinnedSprite(baseGo, SkinSlot.TowerBase, skin),
-                AddSkinnedSprite(shadowGo, SkinSlot.TowerShadow, skin),
+                AddSkinnedSprite(shadowGo, SkinSlot.TowerShadow, skin, untinted: true, nativeSize: true),
             });
             DepthSorter depth = go.AddComponent<DepthSorter>();
             SetArray(depth, "renderers", new Object[] { shadowGo.GetComponent<SpriteRenderer>(), baseGo.GetComponent<SpriteRenderer>(), body });
@@ -1026,7 +1054,7 @@ namespace TowerDefense.EditorTools
             SetArray(depth, "renderers", new Object[] { go.GetComponent<SpriteRenderer>() });
             SetIntArray(depth, "parts", new[] { DepthSorter.PartBody });
             SetField(projectile, "depth", depth);
-            SetField(projectile, "skinned", AddSkinnedSprite(go, SkinSlot.Projectile, skin));
+            SetField(projectile, "skinned", AddSkinnedSprite(go, SkinSlot.Projectile, skin, untinted: true, nativeSize: true));
 
             PrefabUtility.SaveAsPrefabAsset(go, ProjectilePrefabPath);
             Object.DestroyImmediate(go);
@@ -1059,12 +1087,16 @@ namespace TowerDefense.EditorTools
         }
 
         // Lets a prefab part take its isometric sprite from 'slot' (its own sprite is the fallback).
-        private static SkinnedSprite AddSkinnedSprite(GameObject go, SkinSlot slot, SkinSet skin)
+        // untinted: a filled slot is drawn white (pixel art has its own colours);
+        // nativeSize: a filled slot is drawn at 64 px per unit whatever the parents' scale.
+        private static SkinnedSprite AddSkinnedSprite(GameObject go, SkinSlot slot, SkinSet skin, bool untinted = false, bool nativeSize = false)
         {
             SkinnedSprite skinned = go.AddComponent<SkinnedSprite>();
             SetField(skinned, "skin", skin);
             SetField(skinned, "slot", slot);
             SetField(skinned, "spriteRenderer", go.GetComponent<SpriteRenderer>());
+            SetField(skinned, "whiteWhenSkinned", untinted);
+            SetField(skinned, "nativeSize", nativeSize);
             return skinned;
         }
 

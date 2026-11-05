@@ -30,6 +30,15 @@ MonoBehaviour:
   - {fileID: 21300000, guid: d2d79e9dbd687e342a7b71ba39666312, type: 3}
   - {fileID: 21300000, guid: c0ba7181a660c4044b2d7fc128cff485, type: 3}
   grassPeriod: 4
+  grassDetails:
+  - {fileID: 21300000, guid: 50ad3fe426f056b49abd960017add1ac, type: 3}
+  - {fileID: 21300000, guid: 1caa65bed143a0e41afe5bf7d089fddd, type: 3}
+  - {fileID: 21300000, guid: dc670ef9e0948ce4cb670f32c5442590, type: 3}
+  - {fileID: 21300000, guid: cbb1fec62f050de46b066cf7c6037c24, type: 3}
+  - {fileID: 21300000, guid: 5c2568276872b144391b3d23029bc76d, type: 3}
+  - {fileID: 21300000, guid: 5232e6196ecc2954e9ad261587cc0daa, type: 3}
+  - {fileID: 21300000, guid: efc2d448b85eb4b40aa90111d110e318, type: 3}
+  - {fileID: 21300000, guid: cc63aa423d5d1934e9b8f7404790eb8e, type: 3}
   pathTiles:
   - {fileID: 21300000, guid: 680571f1dba87e14994af44bdcf0a24e, type: 3}
   - {fileID: 21300000, guid: bdf9225bfea899c459ba701a314122e2, type: 3}
@@ -38,12 +47,14 @@ MonoBehaviour:
   cliffRight: {fileID: 21300000, guid: 9aa0b84bb1a1ce6419edcb1b2a92a1ff, type: 3}
   spawnPortal: {fileID: 21300000, guid: 989ea6fa948f3884d808f9af501f8aed, type: 3}
   goalGate: {fileID: 21300000, guid: 76d0e050a00b92748930e07f44f4bf5a, type: 3}
-  towerBody: {fileID: 0}
+  towerBody: {fileID: 21300000, guid: bfa26d48f5ee3234688c45211ca31d8f, type: 3}
   towerBase: {fileID: 0}
-  towerShadow: {fileID: 0}
-  projectile: {fileID: 0}
-  grunt: {fileID: 0}
-  tank: {fileID: 0}
+  towerShadow: {fileID: 21300000, guid: b29dbd2077fa94842b8b8b04f71e2c4e, type: 3}
+  projectile: {fileID: 21300000, guid: db744ddc49959064db45d2ed3cbfdf6f, type: 3}
+  grunt: {fileID: 21300000, guid: 37d8c9046d53b8044ab5f02e97e87b61, type: 3}
+  tank: {fileID: 21300000, guid: 919d5bc6d3b101a4aab4bc6835a5795a, type: 3}
+  gruntShadow: {fileID: 21300000, guid: 681701b9a47a97c468348f117edb09ac, type: 3}
+  tankShadow: {fileID: 21300000, guid: 66386c34ab9449e4bb90b94e0a110307, type: 3}
   trees:
   - {fileID: 21300000, guid: 27409e34daa0e4040abb57ca35da2283, type: 3}
   - {fileID: 21300000, guid: 18c480f2505b3d740864435a5cd54cf3, type: 3}

@@ -171,6 +171,9 @@ MonoBehaviour:
   skinned:
   - {fileID: 469833512190533750}
   - {fileID: 8043090177593086666}
+  nativeSizeWhenSkinned: 1
+  hideWhenSkinned:
+  - {fileID: 6571927871159746682}
 --- !u!114 &4878537616076728160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -299,6 +302,8 @@ MonoBehaviour:
   spriteRenderer: {fileID: 7535475161577036612}
   image: {fileID: 0}
   grid: {fileID: 0}
+  whiteWhenSkinned: 0
+  nativeSize: 0
 --- !u!1 &9048891219049259618
 GameObject:
   m_ObjectHideFlags: 0
@@ -410,3 +415,5 @@ MonoBehaviour:
   spriteRenderer: {fileID: 8586348533700197578}
   image: {fileID: 0}
   grid: {fileID: 0}
+  whiteWhenSkinned: 1
+  nativeSize: 1

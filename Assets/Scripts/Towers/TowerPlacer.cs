@@ -19,6 +19,10 @@ namespace TowerDefense
         [SerializeField] private SpriteRenderer highlight;
         [Tooltip("Isometric only: thin diamond outline drawn above the units, so the hovered cell stays visible under a tower.")]
         [SerializeField] private SpriteRenderer hoverOutline;
+        [Tooltip("Isometric skin only: semi-transparent tower drawn on a cell where a tower can be placed.")]
+        [SerializeField] private SpriteRenderer previewTower;
+        [SerializeField] private SkinSet skin;
+        [SerializeField] private Color previewColor = new Color(1f, 1f, 1f, 0.55f);
         [SerializeField] private Sprite squareHighlight;
         [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
@@ -109,6 +113,8 @@ namespace TowerDefense
                 Color c = highlight.color;
                 hoverOutline.color = new Color(c.r, c.g, c.b, 0.9f);
             }
+
+            ShowPreviewTower(valid ? cell : (Vector2Int?)null);
 
             // Range circle: around an existing tower, or preview where a new tower would go.
             if (towers.TryGetValue(cell, out Tower existing) && existing != null)
@@ -240,9 +246,25 @@ namespace TowerDefense
             else rangeCircle.enabled = false;
         }
 
+        // Visual only: the skin's tower body, half transparent, depth sorted like a real tower.
+        private void ShowPreviewTower(Vector2Int? cell)
+        {
+            if (previewTower == null) return;
+            Sprite sprite = cell.HasValue && skin != null && grid.ProjectionType == GridProjectionType.Isometric
+                ? skin.Get(SkinSlot.TowerBody) : null;
+            previewTower.enabled = sprite != null;
+            if (sprite == null) return;
+            previewTower.sprite = sprite;
+            previewTower.color = previewColor;
+            previewTower.transform.position = grid.CellToWorld(cell.Value);
+            previewTower.transform.localScale = Vector3.one * grid.CellSize;
+            previewTower.sortingOrder = DepthSorter.OrderFor(grid.SortKey(cell.Value), cell.Value, DepthSorter.PartBody);
+        }
+
         private void HideHover()
         {
             highlight.enabled = false;
+            if (previewTower != null) previewTower.enabled = false;
             if (hoverOutline != null) hoverOutline.enabled = false;
             HideRange();
         }

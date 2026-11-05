@@ -14,6 +14,8 @@ namespace TowerDefense
         public Sprite[] grassTiles = new Sprite[0];
         [Tooltip("Grass tiles repeat every N cells in x and y (variant = x mod N + N * (y mod N)), so their noise joins seamlessly. 0 = pick variants by hash.")]
         public int grassPeriod;
+        [Tooltip("Tufts and flowers drawn over the grass, one variant per cell (non-periodic hash).")]
+        public Sprite[] grassDetails = new Sprite[0];
         public Sprite[] pathTiles = new Sprite[0];
         public Sprite cliffLeft;
         public Sprite cliffRight;
@@ -31,6 +33,8 @@ namespace TowerDefense
         [Header("Enemies")]
         public Sprite grunt;
         public Sprite tank;
+        public Sprite gruntShadow;
+        public Sprite tankShadow;
 
         [Header("Decoration")]
         public Sprite[] trees = new Sprite[0];
@@ -67,6 +71,9 @@ namespace TowerDefense
                 case SkinSlot.HudPanel: return hudPanel;
                 case SkinSlot.HudButton: return hudButton;
                 case SkinSlot.Background: return background;
+                case SkinSlot.GrassDetail: return Pick(grassDetails, variant);
+                case SkinSlot.GruntShadow: return gruntShadow;
+                case SkinSlot.TankShadow: return tankShadow;
                 default: return null;
             }
         }
@@ -78,6 +85,7 @@ namespace TowerDefense
             {
                 case SkinSlot.GrassTile: return Count(grassTiles);
                 case SkinSlot.PathTile: return Count(pathTiles);
+                case SkinSlot.GrassDetail: return Count(grassDetails);
                 case SkinSlot.Tree: return Count(trees);
                 case SkinSlot.Rock: return Count(rocks);
                 case SkinSlot.Bush: return Count(bushes);
@@ -100,6 +108,8 @@ namespace TowerDefense
         {
             grassTiles = new Sprite[0];
             pathTiles = new Sprite[0];
+            grassDetails = new Sprite[0];
+            gruntShadow = tankShadow = null;
             trees = new Sprite[0];
             rocks = new Sprite[0];
             bushes = new Sprite[0];
@@ -125,6 +135,22 @@ namespace TowerDefense
         public static int HashVariant(int x, int y)
         {
             unchecked { return ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff; }
+        }
+
+        // Well-mixed hash of a cell (no short period in x or y, unlike HashVariant's low bits):
+        // used to pick the grass detail overlay, so tufts and flowers never repeat on a grid.
+        public static int MixedHash(int x, int y)
+        {
+            unchecked
+            {
+                uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ 0x9e3779b9u;
+                h ^= h >> 16;
+                h *= 0x85ebca6bu;
+                h ^= h >> 13;
+                h *= 0xc2b2ae35u;
+                h ^= h >> 16;
+                return (int)(h & 0x7fffffff);
+            }
         }
 
         private static int Mod(int a, int n) => ((a % n) + n) % n;

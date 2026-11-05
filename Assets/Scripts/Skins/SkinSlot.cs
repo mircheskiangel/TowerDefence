@@ -23,5 +23,8 @@ namespace TowerDefense
         HudPanel,
         HudButton,
         Background,     // full-screen backdrop behind the island (isometric)
+        GrassDetail,    // variants, tuft/flower overlay on a grass tile (pivot: center)
+        GruntShadow,    // contact shadow under the Grunt ball (pivot: center = feet)
+        TankShadow,     // contact shadow under the Tank ball
     }
 }

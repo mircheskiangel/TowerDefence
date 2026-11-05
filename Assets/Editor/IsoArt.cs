@@ -18,6 +18,14 @@ namespace TowerDefense.EditorTools
         public const int PathVariants = 3;
         public const int CliffHeight = 18;     // pixels below the tile edge
         public const int TreeVariants = 3, RockVariants = 2, BushVariants = 2;
+        public const int GrassDetailVariants = 8; // tuft/flower overlays, picked per cell by a mixing hash
+        // Enemy size relative to the reference (Grunt radius 6 px, Tank 10 px at scale 1).
+        // 1.5: at scale 1 a Grunt is only ~16 screen pixels at 1280 x 720, too small to read.
+        public const float EnemyScale = 1.5f;
+        public const int GruntRadius = 6, TankRadius = 10;
+        // Health bar fill width in pixels (visual only), narrower for the Grunt.
+        public static int GruntBarPixels => Mathf.RoundToInt(12 * EnemyScale);
+        public static int TankBarPixels => Mathf.RoundToInt(18 * EnemyScale);
         public const int Seed = 7;
 
         // World height of the cliff faces (for the camera framing).
@@ -28,6 +36,7 @@ namespace TowerDefense.EditorTools
             for (int j = 0; j < GrassPeriod; j++)
                 for (int i = 0; i < GrassPeriod; i++)
                     Grass(i, j);
+            for (int k = 0; k < GrassDetailVariants; k++) GrassDetail(k);
             for (int k = 0; k < PathVariants; k++) Path(k);
             Cliff(left: true);
             Cliff(left: false);
@@ -39,14 +48,29 @@ namespace TowerDefense.EditorTools
             Portal();
             Gate();
             Background();
+            Tower();
+            TowerShadow();
+            GenerateEnemies(EnemyScale);
+            Projectile();
+        }
+
+        // Grunt and Tank balls with their contact shadows; 'scale' multiplies the reference radii.
+        public static void GenerateEnemies(float scale)
+        {
+            int rg = Mathf.RoundToInt(GruntRadius * scale), rt = Mathf.RoundToInt(TankRadius * scale);
+            Ball("Grunt", rg, Palettes.Yellow, Rgb(62, 38, 6));
+            Ball("Tank", rt, Palettes.Purple, Rgb(30, 14, 50));
+            BallShadow("GruntShadow", rg);
+            BallShadow("TankShadow", rt);
         }
 
         // ------------------------------------------------------------ Tiles
 
         // Grass tile for cell class (i, j) = (x mod 4, y mod 4). The colour bands come from noise
         // in continuous GRID coordinates that repeats every 4 cells, so every tile joins its
-        // neighbours seamlessly. 4 greens, speckles, tufts and flowers, a checker darkening on odd
-        // cells and a slightly darker rim (reference tile()).
+        // neighbours seamlessly. 4 greens, speckles, a checker darkening on odd cells and a
+        // slightly darker rim (reference tile()). Tufts and flowers are separate overlays
+        // (GrassDetail), chosen per cell by a non-periodic hash, so they never repeat every 4 cells.
         private static void Grass(int i, int j)
         {
             var c = new PixelCanvas(TileW, TileH);
@@ -68,7 +92,14 @@ namespace TowerDefense.EditorTools
                 c.Put(px, py, col);
             });
 
-            var rng = Rng(Seed * 1000 + i + j * GrassPeriod);
+            SaveSprite(c, $"Grass_{i + j * GrassPeriod}", PivotCenter);
+        }
+
+        // Transparent tile-sized overlay with 7 grass tufts and sometimes a flower (reference tile()).
+        private static void GrassDetail(int k)
+        {
+            var c = new PixelCanvas(TileW, TileH);
+            var rng = Rng(Seed * 3000 + k);
             for (int t = 0; t < 7; t++)
             {
                 int dx = rng.Next(-26, 27), dy = rng.Next(-11, 12);
@@ -80,7 +111,7 @@ namespace TowerDefense.EditorTools
                 c.Put(x, y - 1, col);
                 if (tall) c.Put(x + 1, y - 2, col);
             }
-            if (rng.NextDouble() < 0.22)
+            if (rng.NextDouble() < 0.35)
             {
                 int dx = rng.Next(-20, 21), dy = rng.Next(-8, 9);
                 Color32 col = Palettes.Flowers[rng.Next(Palettes.Flowers.Length)];
@@ -92,7 +123,7 @@ namespace TowerDefense.EditorTools
                     c.Put(x, y - 1, Rgb(80, 150, 50));
                 }
             }
-            SaveSprite(c, $"Grass_{i + j * GrassPeriod}", PivotCenter);
+            SaveSprite(c, $"GrassDetail_{k}", PivotCenter);
         }
 
         // Dirt road overlay tile: 3 dirt tones in noise bands, speckles, pebbles, darker rim.
@@ -190,19 +221,33 @@ namespace TowerDefense.EditorTools
 
         private static void Bush(int variant)
         {
-            var c = new PixelCanvas(24, 16);
-            int x = 12, y = 12;
+            var c = new PixelCanvas(26, 18);
+            int x = 13, y = 13;
             c.Shadow(x, y, 7, 3, 0.28f);
             int[,] blobs = variant == 0
                 ? new[,] { { 0, -4, 5 }, { -5, -2, 4 }, { 5, -2, 4 } }
                 : new[,] { { -2, -4, 5 }, { 4, -3, 4 }, { -6, -1, 3 } };
+            // Dark outline first (each blob one pixel bigger), then the leaves, then a light top
+            // highlight, so the bush reads against the grass.
+            for (int b = 0; b < blobs.GetLength(0); b++)
+            {
+                int br = blobs[b, 2] + 1;
+                for (int dy = -br; dy <= br; dy++)
+                    for (int dx = -br; dx <= br; dx++)
+                        if (dx * dx + dy * dy <= br * br)
+                            c.Put(x + blobs[b, 0] + dx, y + blobs[b, 1] + dy, Rgb(30, 70, 26));
+            }
             for (int b = 0; b < blobs.GetLength(0); b++)
             {
                 int br = blobs[b, 2];
                 for (int dy = -br; dy <= br; dy++)
                     for (int dx = -br; dx <= br; dx++)
-                        if (dx * dx + dy * dy <= br * br)
-                            c.Put(x + blobs[b, 0] + dx, y + blobs[b, 1] + dy, dy > 0 ? Rgb(54, 122, 44) : Rgb(84, 158, 56));
+                    {
+                        if (dx * dx + dy * dy > br * br) continue;
+                        Color32 col = dy > 0 ? Rgb(54, 122, 44) : Rgb(84, 158, 56);
+                        if (dy < -br * 0.45f && dx < br * 0.3f && dx * dx + dy * dy <= (br - 1) * (br - 1)) col = Rgb(132, 200, 84);
+                        c.Put(x + blobs[b, 0] + dx, y + blobs[b, 1] + dy, col);
+                    }
             }
             SaveSprite(c, $"Bush_{variant}", PivotAt(c, x + 0.5f, y + 1));
         }
@@ -233,21 +278,140 @@ namespace TowerDefense.EditorTools
             SaveSprite(c, "SpawnPortal", PivotAt(c, x, y + 1));
         }
 
-        // Two stone pillars with a lintel and a red banner (reference gate()).
+        // Two stone pillars with a lintel and a red banner (reference gate()). The red glow lies
+        // only on the ground in front of it (the reference also tinted the pillars).
         private static void Gate()
         {
             var c = new PixelCanvas(40, 48);
             int x = 20, y = 42;
             c.Shadow(x, y, 16, 6, 0.35f);
+            // Red glow on the ground in front of the gate only; the pillars are drawn over it.
+            for (int dy = -3; dy <= 4; dy++)
+                for (int dx = -12; dx <= 12; dx++)
+                {
+                    float d = (dx / 12f) * (dx / 12f) + (dy / 4f) * (dy / 4f);
+                    if (d <= 1f) c.Blend(x + dx, y + 1 + dy, Rgb(255, 60, 50), 0.22f * (1f - d));
+                }
             c.FillPolygon(Pts(x, y, -14, 0, -8, -30, -4, -30, -4, 0, -10, 3), Rgb(146, 142, 136));
             c.FillPolygon(Pts(x, y, 4, 0, 4, -30, 10, -30, 14, 0, 8, 3), Rgb(112, 110, 106));
             c.FillPolygon(Pts(x, y, -12, -30, 12, -30, 12, -34, -12, -34), Rgb(176, 172, 164));
             c.FillPolygon(Pts(x, y, -6, -30, 6, -30, 6, -10, 0, -5, -6, -10), Rgb(190, 36, 40));
             c.FillPolygon(Pts(x, y, -2, -22, 2, -22, 2, -18, -2, -18), Rgb(240, 236, 230));
-            for (int dy = -6; dy < 0; dy++)
-                for (int dx = -10; dx < 11; dx++)
-                    c.Blend(x + dx, y + dy, Rgb(255, 60, 50), 0.12f);
             SaveSprite(c, "GoalGate", PivotAt(c, x, y + 1));
+        }
+
+        // ------------------------------------------------------------ Tower, enemies, projectile
+
+        // Wooden tower on a stone base band, with a blue banner on the left face, a dark door, a
+        // battlement with 4 merlons and a small cannon (reference tower()). Left face lighter,
+        // right face darker (light from the upper left). One tile wide, pivot at the feet (the
+        // center of its footprint). The ground shadow is a separate sprite (TowerShadow), so the
+        // fire kick, which scales only this body, never scales the shadow.
+        // Fix vs the reference: its 4th merlon sat 3 px above the back corner of the battlement
+        // (a stray block floating behind the cannon). All 4 merlons now stand on the corners of
+        // the battlement, and the cannon sits 2 px further forward so the back merlon stays
+        // visible behind it, attached to the rim.
+        private static void Tower()
+        {
+            var c = new PixelCanvas(TileW, 52);
+            int x = 32, y = 44;
+            const int w = 12, h = 6, H = 28;
+            Color32 wood = Rgb(150, 104, 66), woodDark = Rgb(106, 72, 48), plank = Rgb(112, 76, 48);
+            c.FillPolygon(Pts(x, y, -w, 0, 0, h, 0, h - H, -w, -H), wood);
+            c.FillPolygon(Pts(x, y, 0, h, w, 0, w, -H, 0, h - H), woodDark);
+            // Stone base band (9 rows), chequered, on both faces.
+            for (int face = 0; face < 2; face++)
+            {
+                bool left = face == 0;
+                float shade = left ? 1f : 0.72f;
+                for (int k = 0; k < 9; k++)
+                    for (int i = 0; i < w; i++)
+                    {
+                        int yy = (int)(y + h * (1f - i / (float)w)) - k;
+                        Color32 stone = ((k / 3 + i / 4) % 2 == 0) ? Rgb(158, 154, 146) : Rgb(138, 134, 128);
+                        c.Put(left ? x - i - 1 : x + i, yy, Mul(stone, shade));
+                    }
+            }
+            // Plank lines every 4 rows above the stone band.
+            for (int k = 10; k < H; k += 4)
+                for (int i = 0; i < w; i++)
+                {
+                    int yy = (int)(y + h * (1f - i / (float)w)) - k;
+                    c.Put(x - i - 1, yy, plank);
+                    c.Put(x + i, yy, Mul(plank, 0.72f));
+                }
+            // Blue banner on the left face, dark door near the front corner.
+            for (int dy = 0; dy < 10; dy++)
+                for (int dx = 0; dx < 5; dx++)
+                    c.Put(x - w + 4 + dx, (int)(y + h * (1f - (w - 4 - dx) / (float)w)) - 16 - dy, Rgb(50, 92, 200));
+            for (int dy = 0; dy < 8; dy++)
+                for (int dx = 0; dx < 4; dx++)
+                    c.Put(x - 4 + dx, (int)(y + h * (1f - (4 - dx) / (float)w)) - dy, Rgb(40, 28, 22));
+            // Battlement top and its inner floor.
+            c.FillPolygon(Pts(x, y, -w, -H, 0, h - H, w, -H, 0, -h - H), Rgb(176, 172, 164));
+            c.FillPolygon(Pts(x, y, -w + 4, -H, 0, h - H - 2, w - 4, -H, 0, -h - H + 2), Rgb(104, 94, 86));
+            // Merlons on the 4 corners: back first, then the cannon, then left, right and front.
+            Merlon(c, x - 2, y - h - H + 1);
+            int cy = y - H + 1;
+            c.FillPolygon(Pts(x, cy, -3, -1, 3, -1, 3, -5, -3, -5), Rgb(70, 70, 78));
+            for (int i = 0; i < 9; i++)
+                for (int j = 0; j < 3; j++)
+                    c.Put(x + i, cy - 6 - i / 2 + j, j < 2 ? Rgb(54, 54, 60) : Rgb(92, 92, 100));
+            Merlon(c, x - w + 1, y - H);
+            Merlon(c, x + w - 5, y - H);
+            Merlon(c, x - 2, y + h - H - 1);
+            SaveSprite(c, "TowerBody", PivotAt(c, x, y));
+        }
+
+        private static void Merlon(PixelCanvas c, int mx, int my)
+        {
+            c.FillPolygon(Pts(mx, my, 0, -3, 4, -3, 4, 1, 0, 1), Rgb(186, 182, 174));
+            c.FillPolygon(Pts(mx, my, 0, -3, 4, -3, 4, -2, 0, -2), Rgb(208, 204, 196));
+        }
+
+        // Soft elliptical ground shadow of the tower, offset 3 px right and down from the feet
+        // like the reference (separate child, not scaled by the fire kick).
+        private static void TowerShadow()
+        {
+            var c = new PixelCanvas(44, 16);
+            c.Shadow(22, 8, 17, 6, 0.38f);
+            SaveSprite(c, "TowerShadow", PivotAt(c, 19, 5));
+        }
+
+        // Glossy ball: 4-tone shaded sphere lit from the upper left, darker rim, dark outline and a
+        // white specular highlight (reference ball()). Pivot at the feet, 1 px below the sphere.
+        // Its contact shadow is a separate sprite (BallShadow) so the walking bob moves only the ball.
+        private static void Ball(string name, int r, Color32[] ramp, Color32 outline)
+        {
+            int size = 2 * r + 6;
+            var c = new PixelCanvas(size, size);
+            int feetX = r + 3, feetY = size - 2;
+            c.Sphere(feetX, feetY - r - 1, r, ramp, outline);
+            SaveSprite(c, name, PivotAt(c, feetX + 0.5f, feetY + 0.5f));
+        }
+
+        private static void BallShadow(string name, int r)
+        {
+            int rx = (int)(r * 1.1f) + 1, ry = Mathf.Max(2, r / 2);
+            var c = new PixelCanvas(2 * rx + 4, 2 * ry + 4);
+            c.Shadow(rx + 2, ry + 2, rx, ry, 0.4f);
+            SaveSprite(c, name, PivotAt(c, rx + 2.5f, ry + 2.5f));
+        }
+
+        // Small glowing orange/yellow ball: soft orange glow, a bright core with an outline and a
+        // white highlight. Pivot at the center (it flies at the existing flight height).
+        private static void Projectile()
+        {
+            var c = new PixelCanvas(14, 14);
+            for (int y = 0; y < 14; y++)
+                for (int x = 0; x < 14; x++)
+                {
+                    float d = Mathf.Sqrt((x - 6.5f) * (x - 6.5f) + (y - 6.5f) * (y - 6.5f));
+                    if (d < 6.5f) c.Blend(x, y, Rgb(255, 150, 40), 0.5f * (1f - d / 6.5f));
+                }
+            Color32[] core = { Rgb(230, 120, 20), Rgb(250, 170, 40), Rgb(255, 215, 80), Rgb(255, 245, 170) };
+            c.Sphere(7, 7, 3, core, Rgb(150, 64, 10));
+            SaveSprite(c, "Projectile", PivotAt(c, 7.5f, 7.5f));
         }
 
         // ------------------------------------------------------------ Backdrop

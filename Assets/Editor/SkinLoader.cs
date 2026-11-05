@@ -7,7 +7,8 @@ namespace TowerDefense.EditorTools
     // Editor-only: creates the SkinSet asset and fills its slots from the generated PNG files in
     // Assets/Art/Generated/ by file name. A missing file leaves its slot empty, so the object
     // keeps its built-in sprite. File names (variant slots count up from 0 until a gap):
-    //   Grass_0.png, Grass_1.png, ...   Path_0..   Tree_0..   Rock_0..   Bush_0..
+    //   Grass_0.png, Grass_1.png, ...   GrassDetail_0..   Path_0..   Tree_0..   Rock_0..   Bush_0..
+    //   GruntShadow, TankShadow,
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
     //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background
     public static class SkinLoader
@@ -32,6 +33,7 @@ namespace TowerDefense.EditorTools
             {
                 skin.grassTiles = LoadVariants(folder, "Grass", ref count);
                 skin.pathTiles = LoadVariants(folder, "Path", ref count);
+                skin.grassDetails = LoadVariants(folder, "GrassDetail", ref count);
                 skin.trees = LoadVariants(folder, "Tree", ref count);
                 skin.rocks = LoadVariants(folder, "Rock", ref count);
                 skin.bushes = LoadVariants(folder, "Bush", ref count);
@@ -42,6 +44,8 @@ namespace TowerDefense.EditorTools
                 skin.towerShadow = Load(folder, "TowerShadow", ref count);
                 skin.grunt = Load(folder, "Grunt", ref count);
                 skin.tank = Load(folder, "Tank", ref count);
+                skin.gruntShadow = Load(folder, "GruntShadow", ref count);
+                skin.tankShadow = Load(folder, "TankShadow", ref count);
                 skin.cliffLeft = Load(folder, "CliffLeft", ref count);
                 skin.cliffRight = Load(folder, "CliffRight", ref count);
                 skin.projectile = Load(folder, "Projectile", ref count);

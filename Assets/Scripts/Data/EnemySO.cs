@@ -17,5 +17,9 @@ namespace TowerDefense
         [Range(0.2f, 1f)] public float scale = 0.5f;
         [Tooltip("Visual only: SkinSet slot for this enemy in the isometric view.")]
         public SkinSlot skinSlot = SkinSlot.Grunt;
+        [Tooltip("Visual only: SkinSet slot of the contact shadow in the isometric view.")]
+        public SkinSlot skinShadowSlot = SkinSlot.GruntShadow;
+        [Tooltip("Visual only: health bar fill width in pixels when skinned (isometric).")]
+        [Min(4)] public int healthBarPixels = 18;
     }
 }

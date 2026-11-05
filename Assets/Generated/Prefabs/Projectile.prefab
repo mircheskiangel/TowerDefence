@@ -146,3 +146,5 @@ MonoBehaviour:
   spriteRenderer: {fileID: 236041517971497769}
   image: {fileID: 0}
   grid: {fileID: 0}
+  whiteWhenSkinned: 1
+  nativeSize: 1

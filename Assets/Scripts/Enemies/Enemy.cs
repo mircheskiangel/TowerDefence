@@ -31,6 +31,7 @@ namespace TowerDefense
         [SerializeField] private EnemyHealthBar healthBar;
         [SerializeField] private ProjectionLook look;   // Visual: flat circle / standing circle + shadow.
         [SerializeField] private DepthSorter depth;     // Visual: isometric draw order.
+        [SerializeField] private SkinnedSprite shadowSkin; // Visual: isometric contact shadow (slot per type).
 
         // Raised whenever this enemy takes damage: (current health, max health). Used by the health bar.
         public event Action<float, float> HealthChanged;
@@ -86,11 +87,17 @@ namespace TowerDefense
             gridPosition = grid.WorldToGrid(transform.position);
             transform.position = grid.GridToWorld(gridPosition);
             transform.localScale = Vector3.one * data.scale * grid.CellSize;
-            if (body == null) body = GetComponent<SpriteRenderer>();
+            if (body == null) body = GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = data.color;
-            if (hitFlash != null) hitFlash.SetBaseColor(data.color);
-            if (look != null) look.SetIsometricSlot(data.skinSlot);
+            if (look != null)
+            {
+                look.SetTint(data.color);
+                look.SetIsometricSlot(data.skinSlot);
+            }
+            if (shadowSkin != null) shadowSkin.SetSlot(data.skinShadowSlot);
+            if (healthBar != null) healthBar.SetSkinnedWidth(data.healthBarPixels);
             if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
+            if (hitFlash != null) hitFlash.SetBaseColor(body != null ? body.color : data.color); // Tint or untinted skin.
             if (healthBar != null) healthBar.ResetBar(); // After the scale is set (keeps a fixed bar size).
             if (depth != null) depth.Initialize(grid, gridPosition);
 
@@ -147,6 +154,7 @@ namespace TowerDefense
             if (grid == null) return;
             transform.position = grid.GridToWorld(gridPosition);
             if (look != null) look.Apply(grid);
+            if (hitFlash != null && body != null) hitFlash.SetBaseColor(body.color);
             if (healthBar != null) healthBar.Layout();
             if (depth != null) depth.Refresh();
         }

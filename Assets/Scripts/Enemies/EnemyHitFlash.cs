@@ -10,6 +10,8 @@ namespace TowerDefense
     {
         [SerializeField] private SpriteRenderer body;
         [SerializeField] private Color flashColor = Color.white;
+        [Tooltip("Flash used when the base color is already white (an untinted isometric skin).")]
+        [SerializeField] private Color whiteBaseFlashColor = new Color(1f, 0.55f, 0.55f);
         [SerializeField] private float duration = 0.08f;
 
         private Color baseColor = Color.white;
@@ -26,7 +28,7 @@ namespace TowerDefense
         public void Flash()
         {
             if (body == null) return;
-            body.color = flashColor;
+            body.color = baseColor == Color.white ? whiteBaseFlashColor : flashColor;
             timeLeft = duration; // Restarting the timer never changes the stored base color.
         }
 
