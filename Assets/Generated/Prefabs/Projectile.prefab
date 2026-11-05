@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 236041517971497769}
   - component: {fileID: 3065703264303172423}
   - component: {fileID: 8029018288056459921}
+  - component: {fileID: 5759433419911172764}
   m_Layer: 0
   m_Name: Projectile
   m_TagString: Untagged
@@ -110,6 +111,7 @@ MonoBehaviour:
   hitDistance: 0.1
   isometricHeight: 0.35
   depth: {fileID: 8029018288056459921}
+  skinned: {fileID: 5759433419911172764}
   maxLifetime: 3
 --- !u!114 &8029018288056459921
 MonoBehaviour:
@@ -126,3 +128,21 @@ MonoBehaviour:
   renderers:
   - {fileID: 236041517971497769}
   parts: 01000000
+--- !u!114 &5759433419911172764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8891715701357429010}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe361d1fae5a4504c870fa508e601c80, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.SkinnedSprite
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
+  slot: 15
+  variant: 0
+  spriteRenderer: {fileID: 236041517971497769}
+  image: {fileID: 0}
+  grid: {fileID: 0}

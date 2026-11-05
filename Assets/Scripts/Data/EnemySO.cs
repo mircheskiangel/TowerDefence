@@ -15,5 +15,7 @@ namespace TowerDefense
         public Color color = Color.white;
         [Tooltip("Visual size relative to one cell.")]
         [Range(0.2f, 1f)] public float scale = 0.5f;
+        [Tooltip("Visual only: SkinSet slot for this enemy in the isometric view.")]
+        public SkinSlot skinSlot = SkinSlot.Grunt;
     }
 }

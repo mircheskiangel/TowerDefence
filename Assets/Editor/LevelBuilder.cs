@@ -28,6 +28,9 @@ namespace TowerDefense.EditorTools
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
         private const string ProjectilePrefabPath = PrefabsFolder + "/Projectile.prefab";
+        // Isometric skin: Assets/Art/DefaultSkin.asset, filled from the PNGs in Assets/Art/Generated/.
+        private const string ArtFolder = "Assets/Art";
+        private const string SkinPath = ArtFolder + "/DefaultSkin.asset";
 
         // --- Level layout ---
         private const int GridWidth = 16;
@@ -95,8 +98,10 @@ namespace TowerDefense.EditorTools
             EnsureFolder(DataFolder);
             EnsureFolder(WavesFolder);
             EnsureFolder(PrefabsFolder);
+            EnsureFolder(ArtFolder);
 
             // 1. Assets
+            SkinSet skin = CreateSkin();
             Sprite square = CreateSprite("Square", SpriteShape.Square);
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
@@ -108,24 +113,25 @@ namespace TowerDefense.EditorTools
             Sprite shadow = CreateShadowSprite("Shadow");
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
-                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f);
+                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f, SkinSlot.Grunt);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
-                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f);
-            CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial);
+                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank);
+            CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial, skin);
             List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
-            CreateProjectilePrefab(circle, spriteMaterial); // Before the tower prefab, which references it.
-            CreateTowerPrefab(square, towerIso, towerBase, shadow, spriteMaterial);
+            CreateProjectilePrefab(circle, spriteMaterial, skin); // Before the tower prefab, which references it.
+            CreateTowerPrefab(square, towerIso, towerBase, shadow, spriteMaterial, skin);
 
             // 2. Fresh scene (replaces any previous build)
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            skin = AssetDatabase.LoadAssetAtPath<SkinSet>(SkinPath); // Re-loaded, like the prefabs below.
 
             // 3. Grid
             GameObject gridGo = new GameObject("Grid");
             GridManager grid = gridGo.AddComponent<GridManager>();
             grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell, startProjection);
-            BuildBoard(grid, square, diamond, spriteMaterial);
+            BuildBoard(grid, square, diamond, spriteMaterial, skin);
 
             // 4. Camera
             BuildCamera(grid);
@@ -143,7 +149,7 @@ namespace TowerDefense.EditorTools
             WaveManager waveManager = BuildWaveManager(grid, resources, enemyPrefab, waves);
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
-            MessageDisplay messages = BuildUI(resources, waveManager, gameManager);
+            MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin);
             BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
@@ -163,10 +169,11 @@ namespace TowerDefense.EditorTools
         // The floor and spawn/goal markers are drawn by BoardView (square tiles in top-down,
         // diamond tiles in isometric). It is configured here and built once in edit mode;
         // at runtime it rebuilds itself when the projection is switched.
-        private static void BuildBoard(GridManager grid, Sprite square, Sprite diamond, Material material)
+        private static void BuildBoard(GridManager grid, Sprite square, Sprite diamond, Material material, SkinSet skin)
         {
             BoardView board = grid.gameObject.AddComponent<BoardView>();
             SetField(board, "grid", grid);
+            SetField(board, "skin", skin);
             SetField(board, "squareSprite", square);
             SetField(board, "diamondSprite", diamond);
             SetField(board, "material", material);
@@ -269,7 +276,8 @@ namespace TowerDefense.EditorTools
         // Full-screen Win/Lose overlay: dark panel, big title, result line and a Restart button.
         // Created last in the Canvas so it draws on top of the HUD. The GameOverPanel script sits
         // on the always-active parent; only the "Panel" child is shown/hidden.
-        private static void BuildGameOverPanel(Transform canvas, GameManager gameManager, PlayerResources resources, WaveManager waveManager)
+        private static void BuildGameOverPanel(Transform canvas, GameManager gameManager, PlayerResources resources, WaveManager waveManager,
+            GridManager grid, SkinSet skin)
         {
             GameObject root = new GameObject("GameOverUI", typeof(RectTransform));
             root.transform.SetParent(canvas, false);
@@ -281,6 +289,7 @@ namespace TowerDefense.EditorTools
             Image background = panel.GetComponent<Image>();
             background.color = new Color(0f, 0f, 0f, 0.75f);
             background.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
+            AddSkinnedImage(panel, background, SkinSlot.HudPanel, skin, grid);
 
             TextMeshProUGUI title = CreateCenteredText("Title", panel.transform, "GAME OVER", 110, new Vector2(0f, 110f), new Vector2(1200f, 150f));
             title.fontStyle = FontStyles.Bold;
@@ -294,6 +303,7 @@ namespace TowerDefense.EditorTools
             buttonRect.sizeDelta = new Vector2(360f, 96f);
             Image buttonImage = buttonGo.GetComponent<Image>();
             buttonImage.color = new Color(0.30f, 0.75f, 0.95f);
+            AddSkinnedImage(buttonGo, buttonImage, SkinSlot.HudButton, skin, grid);
             Button button = buttonGo.GetComponent<Button>();
             button.targetGraphic = buttonImage;
             TextMeshProUGUI buttonText = CreateCenteredText("Text", buttonGo.transform, "Restart (R)", 42, Vector2.zero, Vector2.zero);
@@ -340,7 +350,8 @@ namespace TowerDefense.EditorTools
 
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
-        private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager, GameManager gameManager)
+        private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager, GameManager gameManager,
+            GridManager grid, SkinSet skin)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -433,7 +444,7 @@ namespace TowerDefense.EditorTools
             MessageDisplay messages = messageGo.AddComponent<MessageDisplay>();
             SetField(messages, "label", messageLabel);
 
-            BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager);
+            BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager, grid, skin);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
@@ -478,6 +489,7 @@ namespace TowerDefense.EditorTools
                 case float f: prop.floatValue = f; break;
                 case bool b: prop.boolValue = b; break;
                 case Color c: prop.colorValue = c; break;
+                case System.Enum e: prop.intValue = System.Convert.ToInt32(e); break;
                 default: Debug.LogError($"[LevelBuilder] Unsupported type for '{fieldName}'"); break;
             }
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -736,7 +748,8 @@ namespace TowerDefense.EditorTools
         }
 
         // Creates the EnemySO asset, or updates it in place (same GUID) if it already exists.
-        private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale)
+        private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale,
+            SkinSlot skinSlot)
         {
             string path = $"{DataFolder}/{name}.asset";
             EnemySO data = AssetDatabase.LoadAssetAtPath<EnemySO>(path);
@@ -751,6 +764,7 @@ namespace TowerDefense.EditorTools
             data.goldReward = goldReward;
             data.color = color;
             data.scale = scale;
+            data.skinSlot = skinSlot;
             EditorUtility.SetDirty(data);
             return data;
         }
@@ -790,7 +804,8 @@ namespace TowerDefense.EditorTools
         }
 
         // One generic enemy prefab (white circle); color/scale/stats come from EnemySO at spawn.
-        private static void CreateEnemyPrefab(Sprite circle, Sprite square, Sprite standingCircle, Sprite shadowSprite, Material material)
+        private static void CreateEnemyPrefab(Sprite circle, Sprite square, Sprite standingCircle, Sprite shadowSprite, Material material,
+            SkinSet skin)
         {
             GameObject go = CreateSpriteObject("Enemy", circle, material, Color.white, OrderEnemies);
             Enemy enemy = go.AddComponent<Enemy>();
@@ -828,6 +843,8 @@ namespace TowerDefense.EditorTools
             SetField(look, "topDownSprite", circle);
             SetField(look, "isometricSprite", standingCircle);
             SetArray(look, "isometricOnly", new Object[] { shadow });
+            SetField(look, "skin", skin);
+            SetField(look, "isometricSlot", SkinSlot.Grunt); // Set per enemy type at spawn (EnemySO.skinSlot).
 
             // Isometric draw order: shadow < body < bar background < bar fill, all by depth.
             DepthSorter depth = go.AddComponent<DepthSorter>();
@@ -869,7 +886,8 @@ namespace TowerDefense.EditorTools
         // Tower root (logic) with three visual children: Body (square in top-down, pillar in
         // isometric; the only part the fire kick scales), and, isometric only, Base (diamond plate)
         // and Shadow (soft ground shadow).
-        private static void CreateTowerPrefab(Sprite square, Sprite standingTower, Sprite basePlate, Sprite shadowSprite, Material material)
+        private static void CreateTowerPrefab(Sprite square, Sprite standingTower, Sprite basePlate, Sprite shadowSprite, Material material,
+            SkinSet skin)
         {
             GameObject go = new GameObject("Tower");
             go.transform.localScale = Vector3.one * CellSize * 0.8f;
@@ -894,6 +912,13 @@ namespace TowerDefense.EditorTools
             SetField(look, "topDownSprite", square);
             SetField(look, "isometricSprite", standingTower);
             SetArray(look, "isometricOnly", new Object[] { baseGo, shadowGo });
+            SetField(look, "skin", skin);
+            SetField(look, "isometricSlot", SkinSlot.TowerBody);
+            SetArray(look, "skinned", new Object[]
+            {
+                AddSkinnedSprite(baseGo, SkinSlot.TowerBase, skin),
+                AddSkinnedSprite(shadowGo, SkinSlot.TowerShadow, skin),
+            });
             DepthSorter depth = go.AddComponent<DepthSorter>();
             SetArray(depth, "renderers", new Object[] { shadowGo.GetComponent<SpriteRenderer>(), baseGo.GetComponent<SpriteRenderer>(), body });
             SetIntArray(depth, "parts", new[] { 0, 1, 2 });
@@ -906,7 +931,7 @@ namespace TowerDefense.EditorTools
         }
 
         // Small yellow circle that homes in on its target.
-        private static void CreateProjectilePrefab(Sprite circle, Material material)
+        private static void CreateProjectilePrefab(Sprite circle, Material material, SkinSet skin)
         {
             GameObject go = CreateSpriteObject("Projectile", circle, material, ProjectileColor, OrderProjectiles);
             go.transform.localScale = Vector3.one * CellSize * 0.2f;
@@ -915,6 +940,7 @@ namespace TowerDefense.EditorTools
             SetArray(depth, "renderers", new Object[] { go.GetComponent<SpriteRenderer>() });
             SetIntArray(depth, "parts", new[] { DepthSorter.PartBody });
             SetField(projectile, "depth", depth);
+            SetField(projectile, "skinned", AddSkinnedSprite(go, SkinSlot.Projectile, skin));
 
             PrefabUtility.SaveAsPrefabAsset(go, ProjectilePrefabPath);
             Object.DestroyImmediate(go);
@@ -930,6 +956,36 @@ namespace TowerDefense.EditorTools
             Debug.LogWarning("[LevelBuilder] Imported TextMesh Pro Essential Resources. " +
                              "Run 'Tower Defense/Build Level' again once the import has finished.");
             return false;
+        }
+
+        // The isometric skin asset (same GUID on every rebuild), filled from the generated PNGs
+        // that exist. With no PNGs every slot stays empty and the level looks as before.
+        private static SkinSet CreateSkin()
+        {
+            SkinSet skin = SkinLoader.LoadOrCreate(SkinPath);
+            int filled = SkinLoader.Fill(skin);
+            Debug.Log($"[LevelBuilder] Skin {SkinPath}: {filled} sprite(s) from {PixelArt.GeneratedFolder}.");
+            return skin;
+        }
+
+        // Lets a prefab part take its isometric sprite from 'slot' (its own sprite is the fallback).
+        private static SkinnedSprite AddSkinnedSprite(GameObject go, SkinSlot slot, SkinSet skin)
+        {
+            SkinnedSprite skinned = go.AddComponent<SkinnedSprite>();
+            SetField(skinned, "skin", skin);
+            SetField(skinned, "slot", slot);
+            SetField(skinned, "spriteRenderer", go.GetComponent<SpriteRenderer>());
+            return skinned;
+        }
+
+        // Same for a UI Image; it follows the projection by itself (V switch) through 'grid'.
+        private static void AddSkinnedImage(GameObject go, Image image, SkinSlot slot, SkinSet skin, GridManager grid)
+        {
+            SkinnedSprite skinned = go.AddComponent<SkinnedSprite>();
+            SetField(skinned, "skin", skin);
+            SetField(skinned, "slot", slot);
+            SetField(skinned, "image", image);
+            SetField(skinned, "grid", grid);
         }
 
         // Unlit sprite material so the level needs no 2D lights to be visible.

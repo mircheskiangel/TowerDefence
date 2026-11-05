@@ -89,6 +89,7 @@ namespace TowerDefense
             if (body == null) body = GetComponent<SpriteRenderer>();
             if (body != null) body.color = data.color;
             if (hitFlash != null) hitFlash.SetBaseColor(data.color);
+            if (look != null) look.SetIsometricSlot(data.skinSlot);
             if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
             if (healthBar != null) healthBar.ResetBar(); // After the scale is set (keeps a fixed bar size).
             if (depth != null) depth.Initialize(grid, gridPosition);

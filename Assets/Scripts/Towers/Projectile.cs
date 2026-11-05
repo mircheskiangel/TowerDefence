@@ -15,6 +15,7 @@ namespace TowerDefense
         [Tooltip("Visual only: how high above the ground the projectile flies in isometric (world units).")]
         [SerializeField] private float isometricHeight = 0.35f;
         [SerializeField] private DepthSorter depth;
+        [SerializeField] private SkinnedSprite skinned;
         [Tooltip("Safety net: the projectile is destroyed after this many seconds no matter what.")]
         [SerializeField] private float maxLifetime = 3f;
 
@@ -24,6 +25,7 @@ namespace TowerDefense
         private Vector2 gridPosition;      // Current position, grid coordinates.
         private Vector2 lastKnownPosition; // Target's last seen position, grid coordinates.
         private bool initialized;
+        private GridProjectionType? skinnedFor; // Projection the skinned sprite was last applied for.
 
         public void Initialize(Enemy newTarget, float newDamage, float newSpeed, GridManager gridManager, Vector2 startGridPosition)
         {
@@ -71,6 +73,11 @@ namespace TowerDefense
             Vector3 world = grid.GridToWorld(gridPosition);
             if (grid.ProjectionType == GridProjectionType.Isometric) world.y += isometricHeight;
             transform.position = world;
+            if (skinned != null && skinnedFor != grid.ProjectionType)
+            {
+                skinned.Apply(grid); // At spawn and after a V switch mid-flight.
+                skinnedFor = grid.ProjectionType;
+            }
         }
     }
 }

@@ -166,6 +166,11 @@ MonoBehaviour:
   isometricOnly:
   - {fileID: 6571927871159746682}
   - {fileID: 9048891219049259618}
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
+  isometricSlot: 5
+  skinned:
+  - {fileID: 469833512190533750}
+  - {fileID: 8043090177593086666}
 --- !u!114 &4878537616076728160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -193,6 +198,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7448989827341596131}
   - component: {fileID: 7535475161577036612}
+  - component: {fileID: 469833512190533750}
   m_Layer: 0
   m_Name: Base
   m_TagString: Untagged
@@ -275,6 +281,24 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
+--- !u!114 &469833512190533750
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6571927871159746682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe361d1fae5a4504c870fa508e601c80, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.SkinnedSprite
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
+  slot: 6
+  variant: 0
+  spriteRenderer: {fileID: 7535475161577036612}
+  image: {fileID: 0}
+  grid: {fileID: 0}
 --- !u!1 &9048891219049259618
 GameObject:
   m_ObjectHideFlags: 0
@@ -285,6 +309,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1252064528927382877}
   - component: {fileID: 8586348533700197578}
+  - component: {fileID: 8043090177593086666}
   m_Layer: 0
   m_Name: Shadow
   m_TagString: Untagged
@@ -367,3 +392,21 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
+--- !u!114 &8043090177593086666
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9048891219049259618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe361d1fae5a4504c870fa508e601c80, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.SkinnedSprite
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
+  slot: 7
+  variant: 0
+  spriteRenderer: {fileID: 8586348533700197578}
+  image: {fileID: 0}
+  grid: {fileID: 0}

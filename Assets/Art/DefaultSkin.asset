@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc99d67af19946749ae0cf4390e64771, type: 3}
+  m_Name: DefaultSkin
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.SkinSet
+  grassTiles: []
+  pathTiles: []
+  cliffLeft: {fileID: 0}
+  cliffRight: {fileID: 0}
+  spawnPortal: {fileID: 0}
+  goalGate: {fileID: 0}
+  towerBody: {fileID: 0}
+  towerBase: {fileID: 0}
+  towerShadow: {fileID: 0}
+  projectile: {fileID: 0}
+  grunt: {fileID: 0}
+  tank: {fileID: 0}
+  trees: []
+  rocks: []
+  bushes: []
+  hudPanel: {fileID: 0}
+  hudButton: {fileID: 0}
