@@ -65,6 +65,12 @@ MonoBehaviour:
   bushes:
   - {fileID: 21300000, guid: 637f5f55dc35ff649a520202aee23c3e, type: 3}
   - {fileID: 21300000, guid: 6dbd89e63b25de14ebf975bdfb5da80e, type: 3}
-  hudPanel: {fileID: 0}
-  hudButton: {fileID: 0}
+  hudPanel: {fileID: 21300000, guid: 2ceaacdb27fd33e44b44f8f887c4f321, type: 3}
+  hudButton: {fileID: 21300000, guid: 07abb918e88bf7140aa63ab93be64599, type: 3}
+  iconCoin: {fileID: 21300000, guid: 4ef5994764b843245870428976467997, type: 3}
+  iconHeart: {fileID: 21300000, guid: 49b6402c580e9ca4d86308f02c43328f, type: 3}
+  iconArrow: {fileID: 21300000, guid: a9484e151b3b7684db186475d7d43395, type: 3}
+  healthBarFrame: {fileID: 21300000, guid: 9610a59e8089c604ba224f66adec555d, type: 3}
+  portalGlow: {fileID: 21300000, guid: 2e32ab7a5360c4144ab278ff44a0db78, type: 3}
+  puff: {fileID: 21300000, guid: 8669eb0cdc23ab94cb026868b572877c, type: 3}
   background: {fileID: 21300000, guid: 119d36d4e1760654b867d2f9be0d1cf0, type: 3}

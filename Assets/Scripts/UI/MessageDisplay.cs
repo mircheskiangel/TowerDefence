@@ -14,6 +14,9 @@ namespace TowerDefense
 
         private float timeLeft;
 
+        // Raised by every Show (text, duration): the isometric HUD shows the message in its panel.
+        public event System.Action<string, float> Shown;
+
         private void Awake()
         {
             if (label == null) label = GetComponent<TMP_Text>();
@@ -27,6 +30,7 @@ namespace TowerDefense
 
         public void Show(string message, float duration)
         {
+            Shown?.Invoke(message, duration);
             if (label == null) return;
             label.text = message;
             timeLeft = duration;

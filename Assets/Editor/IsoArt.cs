@@ -52,6 +52,14 @@ namespace TowerDefense.EditorTools
             TowerShadow();
             GenerateEnemies(EnemyScale);
             Projectile();
+            PortalGlow();
+            HealthBarFrame();
+            Puff();
+            HudPanel();
+            HudButton();
+            IconCoin();
+            IconHeart();
+            IconArrow();
         }
 
         // Grunt and Tank balls with their contact shadows; 'scale' multiplies the reference radii.
@@ -227,28 +235,45 @@ namespace TowerDefense.EditorTools
             int[,] blobs = variant == 0
                 ? new[,] { { 0, -4, 5 }, { -5, -2, 4 }, { 5, -2, 4 } }
                 : new[,] { { -2, -4, 5 }, { 4, -3, 4 }, { -6, -1, 3 } };
-            // Dark outline first (each blob one pixel bigger), then the leaves, then a light top
-            // highlight, so the bush reads against the grass.
-            for (int b = 0; b < blobs.GetLength(0); b++)
+            // Leaves of all blobs as one shape (mask), a dark outline only around the OUTSIDE of
+            // that shape (no dark seams between blobs), and one soft highlight per blob toward the
+            // upper left, so the bush reads against the grass without a "face".
+            bool[,] leaf = new bool[c.Width, c.Height];
+            int owner(int px, int py)
             {
-                int br = blobs[b, 2] + 1;
-                for (int dy = -br; dy <= br; dy++)
-                    for (int dx = -br; dx <= br; dx++)
-                        if (dx * dx + dy * dy <= br * br)
-                            c.Put(x + blobs[b, 0] + dx, y + blobs[b, 1] + dy, Rgb(30, 70, 26));
+                int best = -1; float bestD = float.MaxValue;
+                for (int b = 0; b < blobs.GetLength(0); b++)
+                {
+                    float ddx = px - (x + blobs[b, 0]), ddy = py - (y + blobs[b, 1]);
+                    float d = (ddx * ddx + ddy * ddy) / (blobs[b, 2] * blobs[b, 2]);
+                    if (d <= 1f && d < bestD) { bestD = d; best = b; }
+                }
+                return best;
             }
-            for (int b = 0; b < blobs.GetLength(0); b++)
-            {
-                int br = blobs[b, 2];
-                for (int dy = -br; dy <= br; dy++)
-                    for (int dx = -br; dx <= br; dx++)
-                    {
-                        if (dx * dx + dy * dy > br * br) continue;
-                        Color32 col = dy > 0 ? Rgb(54, 122, 44) : Rgb(84, 158, 56);
-                        if (dy < -br * 0.45f && dx < br * 0.3f && dx * dx + dy * dy <= (br - 1) * (br - 1)) col = Rgb(132, 200, 84);
-                        c.Put(x + blobs[b, 0] + dx, y + blobs[b, 1] + dy, col);
-                    }
-            }
+            for (int py = 0; py < c.Height; py++)
+                for (int px = 0; px < c.Width; px++)
+                    leaf[px, py] = owner(px, py) >= 0;
+            for (int py = 0; py < c.Height; py++)
+                for (int px = 0; px < c.Width; px++)
+                {
+                    if (leaf[px, py]) continue;
+                    bool edge = (px > 0 && leaf[px - 1, py]) || (px < c.Width - 1 && leaf[px + 1, py])
+                             || (py > 0 && leaf[px, py - 1]) || (py < c.Height - 1 && leaf[px, py + 1]);
+                    if (edge) c.Put(px, py, Rgb(30, 70, 26));
+                }
+            for (int py = 0; py < c.Height; py++)
+                for (int px = 0; px < c.Width; px++)
+                {
+                    int b = owner(px, py);
+                    if (b < 0) continue;
+                    float br = blobs[b, 2];
+                    float hx = px - (x + blobs[b, 0] - br * 0.35f), hy = py - (y + blobs[b, 1] - br * 0.4f);
+                    float h = Mathf.Clamp01(1f - Mathf.Sqrt(hx * hx + hy * hy) / (br * 0.55f));
+                    Color32 col = py - (y + blobs[b, 1]) > 0 ? Rgb(54, 122, 44) : Rgb(84, 158, 56);
+                    if (h > 0.45f) col = Rgb(120, 188, 76);
+                    else if (h > 0.05f) col = Rgb(100, 172, 64);
+                    c.Put(px, py, col);
+                }
             SaveSprite(c, $"Bush_{variant}", PivotAt(c, x + 0.5f, y + 1));
         }
 
@@ -269,13 +294,142 @@ namespace TowerDefense.EditorTools
                     float d = Mathf.Sqrt((dx / 4.5f) * (dx / 4.5f) + ((dy + 12) / 13f) * ((dy + 12) / 13f));
                     if (d < 1f) c.Blend(x + dx, y + dy, Rgb(70, 170, 255), 0.95f - 0.5f * d);
                 }
-            for (int dy = -24; dy < 0; dy++)
-                for (int dx = -9; dx < 10; dx++)
-                {
-                    float d = Mathf.Sqrt((dx / 9f) * (dx / 9f) + ((dy + 12) / 15f) * ((dy + 12) / 15f));
-                    if (d < 1f) c.Blend(x + dx, y + dy, Rgb(60, 150, 255), 0.18f * (1f - d));
-                }
             SaveSprite(c, "SpawnPortal", PivotAt(c, x, y + 1));
+        }
+
+        // The portal's soft blue halo (the reference's outer glow) as its own sprite, laid over the
+        // portal with the same canvas and pivot, so it can pulse (GlowPulse) without the stones.
+        private static void PortalGlow()
+        {
+            var c = new PixelCanvas(40, 44);
+            int x = 20, y = 38;
+            for (int dy = -26; dy < 2; dy++)
+                for (int dx = -11; dx < 12; dx++)
+                {
+                    float d = Mathf.Sqrt((dx / 11f) * (dx / 11f) + ((dy + 12) / 16f) * ((dy + 12) / 16f));
+                    if (d < 1f) c.Blend(x + dx, y + dy, Rgb(80, 170, 255), 0.4f * (1f - d));
+                }
+            SaveSprite(c, "SpawnPortalGlow", PivotAt(c, x, y + 1));
+        }
+
+        // ------------------------------------------------------------ Health bar, puff, HUD
+
+        // Health bar frame: 1 px dark border around a dark-red track (the empty part of the bar).
+        // 9-sliced (1 px border), so one sprite fits the Grunt and the Tank bar widths.
+        private static void HealthBarFrame()
+        {
+            var c = new PixelCanvas(4, 4);
+            for (int y = 0; y < 4; y++)
+                for (int x = 0; x < 4; x++)
+                    c.Put(x, y, (x == 0 || y == 0 || x == 3 || y == 3) ? Rgb(20, 14, 14) : Rgb(70, 20, 20));
+            SaveSprite(c, "HealthBarFrame", PivotCenter, new Vector4(1, 1, 1, 1));
+        }
+
+        // Soft dust particle for the tower placement puff (tinted and faded by PuffEffect).
+        private static void Puff()
+        {
+            var c = new PixelCanvas(6, 6);
+            for (int y = 0; y < 6; y++)
+                for (int x = 0; x < 6; x++)
+                {
+                    float d = Mathf.Sqrt((x - 2.5f) * (x - 2.5f) + (y - 2.5f) * (y - 2.5f)) / 3f;
+                    if (d < 1f) c.Blend(x, y, Rgb(236, 228, 210), 1f - d * d);
+                }
+            SaveSprite(c, "Puff", PivotCenter);
+        }
+
+        // Dark metal HUD panel (reference style): rounded 1 px dark outline, 2 px metal frame lit
+        // from the upper left, dark inner field with an inner shadow along its top and left.
+        // 24 x 24 px, 9-sliced with a 6 px border.
+        private static void HudPanel()
+        {
+            var c = new PixelCanvas(24, 24);
+            MetalBox(c, 24, 24, Rgb(26, 30, 38), Rgb(16, 18, 24));
+            SaveSprite(c, "HudPanel", PivotCenter, new Vector4(6, 6, 6, 6));
+        }
+
+        // Button: same frame, light grey field (tinted by the Image colour), 16 x 16, 5 px border.
+        private static void HudButton()
+        {
+            var c = new PixelCanvas(16, 16);
+            MetalBox(c, 16, 16, Rgb(206, 210, 218), Rgb(168, 172, 182));
+            SaveSprite(c, "HudButton", PivotCenter, new Vector4(5, 5, 5, 5));
+        }
+
+        private static void MetalBox(PixelCanvas c, int w, int h, Color32 field, Color32 innerShadow)
+        {
+            Color32 outline = Rgb(8, 9, 12), metal = Rgb(98, 104, 116), lit = Rgb(150, 156, 168), dark = Rgb(62, 66, 76);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    bool corner = (x == 0 || x == w - 1) && (y == 0 || y == h - 1);
+                    if (corner) continue; // rounded: corner pixels stay transparent
+                    int edge = Mathf.Min(Mathf.Min(x, w - 1 - x), Mathf.Min(y, h - 1 - y));
+                    Color32 col;
+                    if (edge == 0) col = outline;
+                    else if (edge <= 2) col = (x <= 2 || y <= 2) ? ((x <= 2 && y <= 2) || x < w - 3 && y < h - 3 ? lit : metal) : dark;
+                    else if (edge == 3) col = outline;
+                    else col = (x == 4 || y == 4) ? innerShadow : field;
+                    c.Put(x, y, col);
+                }
+            // Inner corner of the frame is also rounded.
+            c.Put(1, 1, outline); c.Put(w - 2, 1, outline); c.Put(1, h - 2, outline); c.Put(w - 2, h - 2, outline);
+        }
+
+        // Gold coin: outlined disc, lighter rim highlight upper left, a darker inner ring.
+        private static void IconCoin()
+        {
+            var c = new PixelCanvas(12, 12);
+            Color32[] gold = { Rgb(150, 92, 10), Rgb(214, 150, 22), Rgb(244, 200, 48), Rgb(255, 236, 120) };
+            for (int y = 0; y < 12; y++)
+                for (int x = 0; x < 12; x++)
+                {
+                    float dx = x - 5.5f, dy = y - 5.5f, d = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (d > 5.6f) continue;
+                    Color32 col = d > 4.7f ? Rgb(90, 52, 6) : d > 3.3f && d < 4.1f ? gold[1] : (dx + dy < -2f ? gold[3] : gold[2]);
+                    c.Put(x, y, col);
+                }
+            c.Put(4, 3, Rgb(255, 255, 255));
+            SaveSprite(c, "IconCoin", PivotCenter);
+        }
+
+        // Heart: two lobes and a point, dark outline, light highlight on the left lobe.
+        private static void IconHeart()
+        {
+            var c = new PixelCanvas(13, 12);
+            bool In(float x, float y)
+            {
+                float l = (x - 3.6f) * (x - 3.6f) + (y - 3.6f) * (y - 3.6f), r = (x - 8.4f) * (x - 8.4f) + (y - 3.6f) * (y - 3.6f);
+                bool lobes = l <= 9.6f || r <= 9.6f;
+                bool point = y >= 3.6f && y <= 10.6f && Mathf.Abs(x - 6f) <= (10.6f - y) * 0.85f;
+                return lobes || point;
+            }
+            for (int y = 0; y < 12; y++)
+                for (int x = 0; x < 13; x++)
+                {
+                    float fx = x + 0.5f - 0.5f, fy = y + 0.5f;
+                    if (!In(fx, fy)) continue;
+                    bool edge = !In(fx - 1, fy) || !In(fx + 1, fy) || !In(fx, fy - 1) || !In(fx, fy + 1);
+                    c.Put(x, y, edge ? Rgb(70, 10, 18) : Rgb(220, 48, 64));
+                }
+            c.Put(3, 3, Rgb(255, 170, 176)); c.Put(4, 3, Rgb(255, 170, 176)); c.Put(3, 4, Rgb(255, 170, 176));
+            SaveSprite(c, "IconHeart", PivotCenter);
+        }
+
+        // Left-pointing arrow (the right one is the same image mirrored), light with a dark outline.
+        private static void IconArrow()
+        {
+            var c = new PixelCanvas(9, 11);
+            for (int y = 0; y < 11; y++)
+                for (int x = 0; x < 9; x++)
+                {
+                    float half = (x + 0.5f) * 0.62f; // widens to the right
+                    float dy = Mathf.Abs(y + 0.5f - 5.5f);
+                    if (dy > half + 0.01f) continue;
+                    bool edge = dy > half - 1.05f || x == 8;
+                    c.Put(x, y, edge ? Rgb(12, 14, 18) : Rgb(232, 228, 214));
+                }
+            SaveSprite(c, "IconArrow", PivotCenter);
         }
 
         // Two stone pillars with a lintel and a red banner (reference gate()). The red glow lies
@@ -371,11 +525,14 @@ namespace TowerDefense.EditorTools
 
         // Soft elliptical ground shadow of the tower, offset 3 px right and down from the feet
         // like the reference (separate child, not scaled by the fire kick).
+        // M8.4: darker (0.58) and a little larger (19 x 7 px) so it reads on the grass; a soft
+        // 2-pixel edge keeps it from looking like a hard disc.
         private static void TowerShadow()
         {
-            var c = new PixelCanvas(44, 16);
-            c.Shadow(22, 8, 17, 6, 0.38f);
-            SaveSprite(c, "TowerShadow", PivotAt(c, 19, 5));
+            var c = new PixelCanvas(48, 18);
+            c.Shadow(24, 9, 19, 7, 0.32f);
+            c.Shadow(24, 9, 17, 6, 0.38f);
+            SaveSprite(c, "TowerShadow", PivotAt(c, 21, 6));
         }
 
         // Glossy ball: 4-tone shaded sphere lit from the upper left, darker rim, dark outline and a

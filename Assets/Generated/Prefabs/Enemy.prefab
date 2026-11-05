@@ -172,6 +172,7 @@ MonoBehaviour:
   skinnedBorderColor: {r: 0.078431375, g: 0.05490196, b: 0.05490196, a: 1}
   skinnedFillColor: {r: 0.8235294, g: 0.15686275, b: 0.15686275, a: 1}
   pixelsPerUnit: 64
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
 --- !u!1 &3938116422783030630
 GameObject:
   m_ObjectHideFlags: 0

@@ -54,6 +54,7 @@ so references stay valid). All balance numbers are set in `LevelBuilder.cs`.
 | **P** | Show / hide the debug line of the current A\* path from spawn to goal |
 | **V** | Switch the view: isometric (default) ↔ top-down |
 | **T** | Cycle the targeting mode of **all** towers: First → Closest → Strongest → Weakest |
+| **◀ / ▶** buttons (isometric HUD, top right) | Previous / next targeting mode |
 | **Space** | Skip the countdown before the next wave |
 | **R** (only while the end panel is shown) | Restart the level |
 | **Restart** button (end panel) | Restart the level |
@@ -110,15 +111,16 @@ All runtime code is in `Assets/Scripts/` under the namespace `TowerDefense`.
 | Folder | Main classes |
 |---|---|
 | `Core` | `GameManager` (state machine Playing / Won / Lost, restart), `PlayerResources` (gold, lives), `LivesHandler` (1 life per enemy at the goal), `CameraFitter` (fits the board in either view), `ProjectionSwitcher` (V key) |
-| `Grid` | `GridManager` (cells, blocked cells, spawn / goal, owns the active projection), `IGridProjection`, `TopDownProjection`, `IsometricProjection`, `GridProjectionType`, `BoardView` (floor tiles and spawn / goal markers), `ProjectionLook` (per-view sprite, isometric-only parts), `DepthSorter` (isometric draw order) |
+| `Grid` | `GridManager` (cells, blocked cells, spawn / goal, owns the active projection), `IGridProjection`, `TopDownProjection`, `IsometricProjection`, `GridProjectionType`, `BoardView` (floor, ring, cliffs, backdrop, decoration, spawn / goal markers or portal and gate), `RoadView` (isometric dirt road on the current path), `ProjectionLook` (per-view sprite, isometric-only parts), `DepthSorter` (isometric draw order), `GlowPulse` |
 | `Pathfinding` | `AStarPathfinder`, `MinHeap` (binary heap), `PathDebugView` (P key) |
-| `Enemies` | `Enemy` (movement, re-pathing, health), `EnemyRegistry` (list of active enemies), `EnemyHitFlash`, `EnemyHealthBar` |
-| `Towers` | `Tower` (scan, fire), `TowerPlacer` (mouse placement + path-blocked check, hover highlight), `Projectile`, `RangeIndicator` (range circle / ellipse) |
+| `Enemies` | `Enemy` (movement, re-pathing, health), `EnemyRegistry` (list of active enemies), `EnemyHitFlash`, `EnemyHealthBar`, `EnemyBob`, `VisualFade` (death fade) |
+| `Towers` | `Tower` (scan, fire), `TowerPlacer` (mouse placement + path-blocked check, hover highlight), `Projectile`, `RangeIndicator` (range circle / ellipse), `PuffEffect` (placement puff) |
 | `Towers/Targeting` | `TargetingMode`, `ITargetSelector`, `TargetSelectors` (the four strategies), `TargetingSettings` (global mode), `TargetingModeSwitcher` (T key) |
 | `Waves` | `WaveManager` (countdowns, spawning coroutine, wave-cleared check) |
-| `UI` | `ResourcesHUD`, `TargetingHUD`, `WaveHUD`, `MessageDisplay`, `GameOverPanel` |
+| `UI` | `ResourcesHUD`, `TargetingHUD`, `WaveHUD`, `MessageDisplay`, `GameOverPanel`, `IsoHud` (isometric panels) |
+| `Skins` | `SkinSet` (sprite slots), `SkinSlot`, `SkinnedSprite` (one renderer or image taking its sprite from a slot) |
 | `Data` | ScriptableObjects: `EnemySO`, `TowerSO`, `WaveSO` |
-| `Assets/Editor` | `LevelBuilder` (builds the level), `BalanceBot` (automated balance tests, editor-only) |
+| `Assets/Editor` | `LevelBuilder` (builds the level), `PixelArt`, `IsoArt`, `SkinLoader` (generated art and skin), `BalanceBot` (automated balance tests, editor-only) |
 
 The systems talk to each other mostly through **C# events**, so no class needs to poll another:
 
@@ -178,30 +180,88 @@ on top. Each projection defines a depth key:
 SortKey = -(cx + cy)        larger = nearer the camera = drawn in front
 ```
 
-`DepthSorter` turns it into an explicit `sortingOrder` for every unit (towers, enemies, projectiles):
+`DepthSorter` turns it into an explicit `sortingOrder` for everything that stands on the board
+(towers, enemies, projectiles, decoration, portal and gate):
 
 ```
-sortingOrder = Band + (round(SortKey * 10) * 32 + tieSlot) * 4 + part
-tieSlot      = clamp(floor((cx + 0.5) * 2), 0, 31)
-Band = 31000, part: shadow 0, base / body 1-2, health bar back 2, bar fill 3
+sortingOrder = 100 + (depthIndex * 20 + tieSlot) * 4 + part
+depthIndex   = round(SortKey * 10) + 265         (cx + cy from -2.5 to 26.5: board + ring)
+tieSlot      = floor(cx + 1.5)                   (one slot per cell column, cx -1.5 .. 18.5)
+part: shadow 0, base / body 1-2, health bar frame 2, bar fill 3
+z            = -cx * 0.001 + cy * 0.00001        (final tie-break, isometric only)
 ```
 
-- `round(SortKey * 10)` gives depth steps of 0.1 cell.
+- `depthIndex` gives depth steps of 0.1 cell over the whole island, so nothing is ever clamped
+  (orders 100..23379).
 - `tieSlot` breaks ties between objects at the **same depth** (same cx + cy, side by side on the
-  screen): the one with the larger cx is drawn in front, so equal-depth units always get different,
-  fixed orders and can never flicker.
+  screen): the one in the higher cell column is drawn in front.
+- Two objects in the same depth step **and** the same column get the same order; for them the tiny
+  `z` offset decides (Unity sorts equal orders by distance to the camera): larger cx in front, then
+  smaller cy. So no pair can ever swap from frame to frame. In top-down z stays 0.
 - `part` keeps an object's own pieces in order (shadow under body, health bar over body).
-- `Band` keeps every unit above the floor (orders 0-20). The two overlays, a dim copy of the path line
-  and the hover outline, use order 32700, above every unit, so they stay visible behind tall towers.
+- All orders lie above the floor, road, range ellipse and highlights (orders -2..20). The two
+  overlays, a dim copy of the path line and the hover outline, use order 32700, above every unit.
 
 Explicit orders were chosen over Unity's custom transparency sort axis because that axis is a global
 renderer setting (it would also change the top-down view) and it sorts each sprite by its own pivot,
 which would put a health bar behind its own enemy. In top-down every renderer keeps its original
 type-based order.
 
-Isometric-only visuals (all generated in code, like everything else): diamond floor tiles, standing
-towers (the fire kick scales only the pillar, not the base plate), shaded sphere enemies, soft ground
-shadows, a projected range **ellipse**, projectiles flying at a small height, and a thin hover outline.
+Isometric-only visuals (all generated in code, like everything else, see the next section): the
+grass island with a decorative ring, cliffs and a dirt road, pixel-art towers and enemies, the range
+**ellipse**, projectiles flying at a small height, a thin hover outline and the metal-framed HUD.
+
+---
+
+## Skins and pixel art
+
+All isometric art is **generated in code** by editor scripts; there are no imported images, so the
+project needs no external art licences. `Tower Defense > Build Level` writes the PNG files and fills
+the skin:
+
+- `Assets/Editor/PixelArt.cs`: the toolbox. Seeded hash and value noise (the same hash formula as the
+  reference script), palettes, ramp shading, polygon / ellipse / sphere drawing on a pixel canvas.
+  `SaveSprite` writes `Assets/Art/Generated/<name>.png` and imports it as a pixel-art sprite: Point
+  filter, no compression, no mipmaps, **64 pixels per unit** (a 64 x 32 px diamond = the 1 x 0.5 unit
+  tile), pivot at the center for tiles and at the feet for standing objects, optional 9-slice border.
+- `Assets/Editor/IsoArt.cs`: the drawings, ported from `Reference/skins_preview_reference.py`: grass
+  (16 tiles whose noise is periodic over 4 x 4 cells, so tiles join seamlessly) plus 8 tuft/flower
+  overlays picked per cell with a non-periodic hash, dirt road tiles, cliffs, trees, rocks, bushes,
+  portal (with a separate pulsing glow), gate, backdrop, tower, Grunt and Tank balls with contact
+  shadows, projectile, health bar frame, HUD panel, button and icons.
+- **Fixed seeds** everywhere (no `UnityEngine.Random`), so a rebuild writes byte-identical PNGs.
+- `Assets/Art/DefaultSkin.asset` is a `SkinSet` (`Assets/Scripts/Skins/`): named slots for grass,
+  grass details, path, cliffs, portal, portal glow, gate, backdrop, decoration (trees, rocks,
+  bushes), tower body / base / shadow, Grunt, Tank and their shadows, projectile, health bar frame,
+  placement puff and HUD parts. `SkinLoader` fills the slots from the PNGs by file name.
+- **Every slot is optional.** An empty slot falls back to the plain M7 look for that part, and the
+  top-down view never uses skins.
+
+**Replacing generated art with hand-drawn art:** draw a PNG with the same size and pivot (for example
+`Assets/Art/Generated/TowerBody.png`, 64 x 52 px, feet at pixel (32, 44)), and either assign it to
+the slot in `DefaultSkin.asset` or remove the `IsoArt` call for that sprite so the builder does not
+overwrite it. Keep 64 pixels per unit so it matches the rest of the art.
+
+**Decorative ring.** One cell of scenery around the 16 x 10 board (darker grass, trees, rocks and
+bushes placed with a fixed seed, never on the cells next to the portal and the gate, only low decor
+on the two front edges). Ring cells are **not part of the grid**: not clickable, not walkable, not
+blocked, invisible to A\* and to tower placement.
+
+**Dynamic road.** `RoadView` draws dirt tiles on the cells of the current spawn -> goal path (the same
+`PathDebugView.CurrentPath` the debug line shows) plus the ring cells in front of the portal and the
+gate. It redraws only when the path changes (after `GridChanged`) or the view is switched; it never
+runs A\* itself.
+
+**HUD (isometric).** `IsoHud` replaces the text labels with metal-framed panels: gold and lives with
+icons, `WAVE 1 / 5`, the targeting selector with arrow buttons, a tower card (icon and price) and a
+bottom message panel ("Path blocked!", "Cannot build on a wall", the wave countdown). Top-down keeps
+the original labels.
+
+Small visual-only effects (isometric): hit flash (light red tint on the ball), a short fade when an
+enemy dies, a slow pulse of the portal glow, a dust puff when a tower is placed, and a slight bob of
+the walking balls.
+
+The `Reference/` (art reference) and `Screenshots/` folders are git-ignored.
 
 ---
 

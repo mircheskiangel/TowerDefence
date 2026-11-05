@@ -10,7 +10,8 @@ namespace TowerDefense.EditorTools
     //   Grass_0.png, Grass_1.png, ...   GrassDetail_0..   Path_0..   Tree_0..   Rock_0..   Bush_0..
     //   GruntShadow, TankShadow,
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
-    //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background
+    //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background, HealthBarFrame,
+    //   SpawnPortalGlow, Puff, IconCoin, IconHeart, IconArrow
     public static class SkinLoader
     {
         // Loads the SkinSet at 'path', or creates it (an existing asset keeps its GUID).
@@ -52,6 +53,12 @@ namespace TowerDefense.EditorTools
                 skin.hudPanel = Load(folder, "HudPanel", ref count);
                 skin.hudButton = Load(folder, "HudButton", ref count);
                 skin.background = Load(folder, "Background", ref count);
+                skin.healthBarFrame = Load(folder, "HealthBarFrame", ref count);
+                skin.portalGlow = Load(folder, "SpawnPortalGlow", ref count);
+                skin.puff = Load(folder, "Puff", ref count);
+                skin.iconCoin = Load(folder, "IconCoin", ref count);
+                skin.iconHeart = Load(folder, "IconHeart", ref count);
+                skin.iconArrow = Load(folder, "IconArrow", ref count);
             }
             EditorUtility.SetDirty(skin);
             return count;

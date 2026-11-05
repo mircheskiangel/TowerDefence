@@ -26,6 +26,8 @@ namespace TowerDefense
         [SerializeField] private Color skinnedBorderColor = new Color(20f / 255f, 14f / 255f, 14f / 255f);
         [SerializeField] private Color skinnedFillColor = new Color(210f / 255f, 40f / 255f, 40f / 255f);
         [SerializeField] private float pixelsPerUnit = 64f;
+        [Tooltip("Isometric skin: 9-sliced frame (1 px dark border, dark-red track for the empty part).")]
+        [SerializeField] private SkinSet skin;
 
         private int skinnedWidthPixels = 18;
         private float fraction = 1f;
@@ -42,6 +44,7 @@ namespace TowerDefense
         }
 
         private Color backgroundColor;
+        private Sprite backgroundSprite;
         private bool backgroundCaptured;
 
         private void Awake()
@@ -53,6 +56,7 @@ namespace TowerDefense
         {
             if (backgroundCaptured || background == null) return;
             backgroundColor = background.color;
+            backgroundSprite = background.sprite;
             backgroundCaptured = true;
         }
 
@@ -80,6 +84,7 @@ namespace TowerDefense
         // top-down, a standing circle in isometric). Keeps the current fill and visibility.
         public void Layout()
         {
+            CaptureBackground();
             Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
             float sx = Mathf.Approximately(parentScale.x, 0f) ? 1f : parentScale.x;
             float sy = Mathf.Approximately(parentScale.y, 0f) ? 1f : parentScale.y;
@@ -94,7 +99,22 @@ namespace TowerDefense
             Vector2 bar = BarSize;
             transform.localPosition = new Vector3(0f, top + (Gap + bar.y * 0.5f) / sy, 0f);
 
-            background.transform.localScale = new Vector3(bar.x, bar.y, 1f);
+            Sprite frame = Skinned && skin != null ? skin.Get(SkinSlot.HealthBarFrame) : null;
+            if (frame != null)
+            {
+                // Pixel bar: the sliced frame draws the border and the dark-red track; the red fill
+                // lies on the track (its 2 px row is inside the 1 px border).
+                background.sprite = frame;
+                background.drawMode = SpriteDrawMode.Sliced;
+                background.size = bar;
+                background.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                background.sprite = backgroundSprite;
+                background.drawMode = SpriteDrawMode.Simple;
+                background.transform.localScale = new Vector3(bar.x, bar.y, 1f);
+            }
             background.transform.localPosition = Vector3.zero;
             SetFill(fraction); // Bar style may have changed with the projection.
         }
@@ -118,7 +138,7 @@ namespace TowerDefense
             if (Skinned)
             {
                 fill.color = skinnedFillColor;
-                background.color = skinnedBorderColor;
+                background.color = background.drawMode == SpriteDrawMode.Sliced ? Color.white : skinnedBorderColor;
                 return;
             }
             background.color = backgroundColor;

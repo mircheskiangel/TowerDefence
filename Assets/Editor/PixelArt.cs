@@ -285,7 +285,9 @@ namespace TowerDefense.EditorTools
 
         // Writes the canvas as Assets/Art/Generated/<name>.png and imports it as a pixel-art
         // sprite (see the class comment). Returns the imported sprite.
-        public static Sprite SaveSprite(PixelCanvas canvas, string name, Vector2 pivot)
+        // 'border' (left, bottom, right, top in pixels) makes the sprite 9-sliceable (UI panels,
+        // the health bar frame); zero = a plain sprite.
+        public static Sprite SaveSprite(PixelCanvas canvas, string name, Vector2 pivot, Vector4 border = default)
         {
             EnsureFolder(GeneratedFolder);
             string path = $"{GeneratedFolder}/{name}.png";
@@ -302,6 +304,7 @@ namespace TowerDefense.EditorTools
             settings.spriteAlignment = (int)SpriteAlignment.Custom;
             settings.spritePivot = pivot;
             settings.spriteMeshType = SpriteMeshType.FullRect;
+            settings.spriteBorder = border;
             importer.SetTextureSettings(settings);
             importer.spritePixelsPerUnit = PixelsPerUnit;
             importer.filterMode = FilterMode.Point;

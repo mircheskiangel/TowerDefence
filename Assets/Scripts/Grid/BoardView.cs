@@ -186,18 +186,32 @@ namespace TowerDefense
         {
             Sprite standing = skin != null && slot != SkinSlot.None ? skin.Get(slot) : null;
             if (standing != null)
-                CreateStanding(objectName, transform, standing, OutsideNeighbour(grid, cell));
+            {
+                Sprite glow = slot == SkinSlot.SpawnPortal ? skin.Get(SkinSlot.PortalGlow) : null;
+                CreateStanding(objectName, transform, standing, OutsideNeighbour(grid, cell), glow);
+            }
             else
                 CreateSprite(objectName, transform, plain, color, markerSortingOrder, grid.CellToWorld(cell), plainScale);
         }
 
         // Standing sprite (pivot at its feet, native size) with a DepthSorter at 'gridPosition'.
-        private void CreateStanding(string objectName, Transform parent, Sprite sprite, Vector2 gridPosition)
+        // An optional glow sprite is laid over it (same pivot) and pulses softly (GlowPulse).
+        private void CreateStanding(string objectName, Transform parent, Sprite sprite, Vector2 gridPosition, Sprite glow = null)
         {
             SpriteRenderer sr = CreateSprite(objectName, parent, sprite, Color.white, markerSortingOrder,
                 grid.GridToWorld(gridPosition), Vector3.one * grid.CellSize);
             DepthSorter depth = sr.gameObject.AddComponent<DepthSorter>();
-            depth.Configure(new Renderer[] { sr }, new[] { DepthSorter.PartBody });
+            if (glow != null)
+            {
+                SpriteRenderer glowRenderer = CreateSprite("Glow", sr.transform, glow, Color.white, markerSortingOrder,
+                    sr.transform.position, Vector3.one);
+                glowRenderer.gameObject.AddComponent<GlowPulse>().Configure(glowRenderer);
+                depth.Configure(new Renderer[] { sr, glowRenderer }, new[] { DepthSorter.PartBody, DepthSorter.PartBarBack });
+            }
+            else
+            {
+                depth.Configure(new Renderer[] { sr }, new[] { DepthSorter.PartBody });
+            }
             depth.Initialize(grid, gridPosition);
         }
 
@@ -233,7 +247,8 @@ namespace TowerDefense
         {
             Transform child = transform.Find(childName);
             if (child == null) return;
-            child.SetParent(null); // Detach first so a same-frame rebuild never finds the old one.
+            child.gameObject.SetActive(false); // Hidden at once (Destroy waits for the end of the frame)...
+            child.SetParent(null);             // ...and detached, so a same-frame rebuild never finds it.
             if (Application.isPlaying) Destroy(child.gameObject);
             else DestroyImmediate(child.gameObject);
         }

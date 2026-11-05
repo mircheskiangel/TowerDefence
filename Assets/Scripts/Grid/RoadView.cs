@@ -42,6 +42,9 @@ namespace TowerDefense
             Transform old = transform.Find(TilesName);
             if (old != null)
             {
+                // Hidden at once: Destroy only happens at the end of the frame, and several
+                // rebuilds in one frame (several towers placed at once) must not stack up.
+                old.gameObject.SetActive(false);
                 old.SetParent(null);
                 if (Application.isPlaying) Destroy(old.gameObject);
                 else DestroyImmediate(old.gameObject);

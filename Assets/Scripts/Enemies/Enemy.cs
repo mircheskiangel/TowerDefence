@@ -242,6 +242,9 @@ namespace TowerDefense
         {
             if (IsDead) return;
             Deactivate();
+            // Visual only (isometric skin): a fading copy of the ball and its shadow; the enemy
+            // itself is removed exactly as before.
+            if (look != null && look.IsSkinned) VisualFade.Spawn(0.25f, 1.3f, body, shadowSkin != null ? shadowSkin.GetComponent<SpriteRenderer>() : null);
             OnDied?.Invoke(this);
             if (PlayerResources.Instance != null) PlayerResources.Instance.AddGold(data.goldReward);
             Destroy(gameObject);

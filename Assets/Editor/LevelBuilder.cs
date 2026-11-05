@@ -157,7 +157,7 @@ namespace TowerDefense.EditorTools
             WaveManager waveManager = BuildWaveManager(grid, resources, enemyPrefab, waves);
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
-            MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin);
+            MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin, basicTower);
             BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
@@ -346,7 +346,7 @@ namespace TowerDefense.EditorTools
             SetField(indicator, "material", material);
             SetField(indicator, "sortingOrder", OrderRange);
             // Isometric ellipse style (top-down keeps the ring sprite): soft white fill, thin brighter outline.
-            SetField(indicator, "fillColor", new Color(1f, 1f, 1f, 0.13f));
+            SetField(indicator, "fillColor", new Color(1f, 1f, 1f, 0.2f));
             SetField(indicator, "lineColor", new Color(1f, 1f, 1f, 0.6f));
             SetField(indicator, "lineWidth", 0.022f);
 
@@ -356,6 +356,7 @@ namespace TowerDefense.EditorTools
             preview.GetComponent<SpriteRenderer>().enabled = false;
             SetField(placer, "previewTower", preview.GetComponent<SpriteRenderer>());
             SetField(placer, "skin", skin);
+            SetField(placer, "puffMaterial", material);
             SetField(placer, "rangeIndicator", indicator);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
@@ -374,7 +375,8 @@ namespace TowerDefense.EditorTools
         // Full-screen Win/Lose overlay: dark panel, big title, result line and a Restart button.
         // Created last in the Canvas so it draws on top of the HUD. The GameOverPanel script sits
         // on the always-active parent; only the "Panel" child is shown/hidden.
-        private static void BuildGameOverPanel(Transform canvas, GameManager gameManager, PlayerResources resources, WaveManager waveManager,
+        // Returns the isometric frame (shown by IsoHud only with the isometric HUD).
+        private static GameObject BuildGameOverPanel(Transform canvas, GameManager gameManager, PlayerResources resources, WaveManager waveManager,
             GridManager grid, SkinSet skin)
         {
             GameObject root = new GameObject("GameOverUI", typeof(RectTransform));
@@ -387,7 +389,12 @@ namespace TowerDefense.EditorTools
             Image background = panel.GetComponent<Image>();
             background.color = new Color(0f, 0f, 0f, 0.75f);
             background.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
-            AddSkinnedImage(panel, background, SkinSlot.HudPanel, skin, grid);
+
+            // Isometric HUD style: a dark metal-framed box behind title, result and button (the
+            // full-screen dim stays in both views).
+            Image frame = UiImage("Frame", panel.transform, skin.hudPanel, Color.white, true);
+            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 440f));
+            frame.gameObject.SetActive(false);
 
             TextMeshProUGUI title = CreateCenteredText("Title", panel.transform, "GAME OVER", 110, new Vector2(0f, 110f), new Vector2(1200f, 150f));
             title.fontStyle = FontStyles.Bold;
@@ -401,6 +408,8 @@ namespace TowerDefense.EditorTools
             buttonRect.sizeDelta = new Vector2(360f, 96f);
             Image buttonImage = buttonGo.GetComponent<Image>();
             buttonImage.color = new Color(0.30f, 0.75f, 0.95f);
+            buttonImage.type = Image.Type.Sliced; // No effect without a sprite (top-down look unchanged).
+            buttonImage.pixelsPerUnitMultiplier = UiPixelMultiplier;
             AddSkinnedImage(buttonGo, buttonImage, SkinSlot.HudButton, skin, grid);
             Button button = buttonGo.GetComponent<Button>();
             button.targetGraphic = buttonImage;
@@ -419,6 +428,7 @@ namespace TowerDefense.EditorTools
             SetField(script, "title", title);
             SetField(script, "detail", detail);
             SetField(script, "restartButton", button);
+            return frame.gameObject;
         }
 
         private static TextMeshProUGUI CreateCenteredText(string name, Transform parent, string text, float size, Vector2 position, Vector2 boxSize)
@@ -449,7 +459,7 @@ namespace TowerDefense.EditorTools
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
         private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager, GameManager gameManager,
-            GridManager grid, SkinSet skin)
+            GridManager grid, SkinSet skin, TowerSO towerData)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -542,7 +552,9 @@ namespace TowerDefense.EditorTools
             MessageDisplay messages = messageGo.AddComponent<MessageDisplay>();
             SetField(messages, "label", messageLabel);
 
-            BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager, grid, skin);
+            GameObject gameOverFrame = BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager, grid, skin);
+            BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin, towerData,
+                new[] { labelGo, targetingGo, waveGo, messageGo }, gameOverFrame);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
@@ -953,6 +965,7 @@ namespace TowerDefense.EditorTools
             SetField(look, "nativeSizeWhenSkinned", true);
             SetArray(look, "skinned", new Object[] { shadowSkin });
             SetField(healthBar, "look", look);
+            SetField(healthBar, "skin", skin);
             SetField(enemy, "shadowSkin", shadowSkin);
             EnemyBob bob = go.AddComponent<EnemyBob>();
             SetField(bob, "enemy", enemy);
@@ -1108,6 +1121,157 @@ namespace TowerDefense.EditorTools
             SetField(skinned, "slot", slot);
             SetField(skinned, "image", image);
             SetField(skinned, "grid", grid);
+        }
+
+        // UI pixel art: one sprite pixel = 3 canvas units at the 1920 x 1080 reference size
+        // (canvas 100 units per unit / sprite 64 px per unit / multiplier 0.52 ~= 3).
+        private const float UiPixelMultiplier = 0.52f;
+        private static readonly Color HudTextColor = new Color(0.93f, 0.91f, 0.85f);
+        private static readonly Color HudGoldColor = new Color(1f, 0.84f, 0.35f);
+        private static readonly Color HudLivesColor = new Color(1f, 0.55f, 0.58f);
+        private static readonly Color HudArrowButtonColor = new Color(0.42f, 0.47f, 0.56f);
+
+        // The isometric HUD (dark metal panels with icons), shown by IsoHud instead of the
+        // original labels in isometric. Top row like the original layout: gold and lives left,
+        // wave centre, targeting selector right; tower card bottom left; message panel bottom centre.
+        private static void BuildIsoHud(GameObject canvasGo, PlayerResources resources, WaveManager waveManager, GameManager gameManager,
+            MessageDisplay messages, GridManager grid, SkinSet skin, TowerSO towerData, GameObject[] topDownLabels, GameObject gameOverFrame)
+        {
+            RectTransform root = UiRect("IsoHUD", canvasGo.transform);
+            StretchFull(root);
+            root.SetAsFirstSibling(); // Under the Game Over overlay.
+
+            // Gold (coin) and lives (heart), top left.
+            RectTransform gold = UiPanel("GoldPanel", root, skin, new Vector2(0f, 1f), new Vector2(20f, -12f), new Vector2(200f, 64f));
+            UiIcon("Coin", gold, skin.iconCoin, new Vector2(20f, 0f), 36f);
+            TextMeshProUGUI goldText = UiText("Value", gold, "0", 36, HudGoldColor, TextAlignmentOptions.Left, new Vector2(66f, 0f), new Vector2(124f, 56f));
+            RectTransform lives = UiPanel("LivesPanel", root, skin, new Vector2(0f, 1f), new Vector2(232f, -12f), new Vector2(170f, 64f));
+            UiIcon("Heart", lives, skin.iconHeart, new Vector2(20f, 0f), 36f);
+            TextMeshProUGUI livesText = UiText("Value", lives, "0", 36, HudLivesColor, TextAlignmentOptions.Left, new Vector2(68f, 0f), new Vector2(94f, 56f));
+
+            // Wave, top centre.
+            RectTransform wave = UiPanel("WavePanel", root, skin, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(300f, 64f));
+            TextMeshProUGUI waveText = UiText("Value", wave, "WAVE 1 / 5", 34, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(280f, 56f), centered: true);
+
+            // Targeting selector, top right: [<] TARGET: FIRST [>].
+            RectTransform target = UiPanel("TargetPanel", root, skin, new Vector2(1f, 1f), new Vector2(-20f, -12f), new Vector2(470f, 64f));
+            Button previous = UiArrowButton("Previous", target, skin, new Vector2(0f, 0.5f), new Vector2(8f, 0f), false);
+            Button next = UiArrowButton("Next", target, skin, new Vector2(1f, 0.5f), new Vector2(-8f, 0f), true);
+            TextMeshProUGUI targetText = UiText("Value", target, "TARGET: FIRST", 30, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(340f, 56f), centered: true);
+
+            // Tower card, bottom left: tower icon (from the tower skin) and its price.
+            RectTransform card = UiPanel("TowerCard", root, skin, new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(262f, 128f));
+            Image towerIcon = UiImage("TowerIcon", card, skin.towerBody, Color.white, false);
+            towerIcon.preserveAspect = true;
+            SetRect(towerIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(128f, 104f));
+            UiIcon("Coin", card, skin.iconCoin, new Vector2(162f, 0f), 36f);
+            UiText("Price", card, towerData != null ? towerData.cost.ToString() : "?", 38, HudGoldColor, TextAlignmentOptions.Left, new Vector2(204f, 0f), new Vector2(54f, 56f));
+
+            // Message / countdown panel, bottom centre (faded in and out by IsoHud).
+            RectTransform bottom = UiPanel("MessagePanel", root, skin, new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(820f, 64f));
+            CanvasGroup bottomGroup = bottom.gameObject.AddComponent<CanvasGroup>();
+            bottomGroup.alpha = 0f;
+            bottomGroup.blocksRaycasts = false;
+            TextMeshProUGUI bottomText = UiText("Value", bottom, "", 30, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(790f, 56f), centered: true);
+
+            root.gameObject.SetActive(false);
+
+            IsoHud hud = canvasGo.AddComponent<IsoHud>();
+            SetField(hud, "grid", grid);
+            SetField(hud, "skin", skin);
+            SetField(hud, "resources", resources);
+            SetField(hud, "waves", waveManager);
+            SetField(hud, "gameManager", gameManager);
+            SetField(hud, "messages", messages);
+            SetField(hud, "isoRoot", root.gameObject);
+            SetArray(hud, "topDownOnly", topDownLabels);
+            SetArray(hud, "isoOnly", new Object[] { gameOverFrame });
+            SetField(hud, "goldText", goldText);
+            SetField(hud, "livesText", livesText);
+            SetField(hud, "waveText", waveText);
+            SetField(hud, "targetText", targetText);
+            SetField(hud, "previousTarget", previous);
+            SetField(hud, "nextTarget", next);
+            SetField(hud, "bottomPanel", bottomGroup);
+            SetField(hud, "bottomText", bottomText);
+        }
+
+        private static RectTransform UiRect(string name, Transform parent)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return go.GetComponent<RectTransform>();
+        }
+
+        private static void SetRect(RectTransform rect, Vector2 anchor, Vector2 pivot, Vector2 position, Vector2 size)
+        {
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+        }
+
+        private static Image UiImage(string name, Transform parent, Sprite sprite, Color color, bool sliced)
+        {
+            RectTransform rect = UiRect(name, parent);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = false;
+            if (sliced)
+            {
+                image.type = Image.Type.Sliced;
+                image.pixelsPerUnitMultiplier = UiPixelMultiplier;
+            }
+            return image;
+        }
+
+        // Panel anchored at 'anchor' with the same pivot (corner / edge of the screen).
+        private static RectTransform UiPanel(string name, Transform parent, SkinSet skin, Vector2 anchor, Vector2 position, Vector2 size)
+        {
+            Image panel = UiImage(name, parent, skin.hudPanel, Color.white, true);
+            SetRect(panel.rectTransform, anchor, anchor, position, size);
+            return panel.rectTransform;
+        }
+
+        // Pixel icon at 'x' from the panel's left edge, vertically centred, 'height' canvas units high.
+        private static void UiIcon(string name, RectTransform panel, Sprite sprite, Vector2 offset, float height)
+        {
+            Image icon = UiImage(name, panel, sprite, Color.white, false);
+            float aspect = sprite != null ? sprite.rect.width / sprite.rect.height : 1f;
+            SetRect(icon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), offset, new Vector2(height * aspect, height));
+        }
+
+        private static TextMeshProUGUI UiText(string name, RectTransform panel, string text, float size, Color color,
+            TextAlignmentOptions alignment, Vector2 offset, Vector2 box, bool centered = false)
+        {
+            RectTransform rect = UiRect(name, panel);
+            Vector2 anchor = centered ? new Vector2(0.5f, 0.5f) : new Vector2(0f, 0.5f);
+            SetRect(rect, anchor, anchor, offset, box);
+            TextMeshProUGUI label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            label.text = text;
+            label.fontSize = size;
+            label.fontStyle = FontStyles.Bold;
+            label.color = color;
+            label.alignment = alignment;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Overflow;
+            label.raycastTarget = false;
+            return label;
+        }
+
+        // Small metal button with an arrow icon (the right arrow is the left one mirrored).
+        private static Button UiArrowButton(string name, RectTransform panel, SkinSet skin, Vector2 anchor, Vector2 offset, bool right)
+        {
+            Image image = UiImage(name, panel, skin.hudButton, HudArrowButtonColor, true);
+            image.raycastTarget = true; // Clickable; TowerPlacer ignores clicks over UI.
+            SetRect(image.rectTransform, anchor, anchor, offset, new Vector2(52f, 52f));
+            Button button = image.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            Image arrow = UiImage("Arrow", image.rectTransform, skin.iconArrow, Color.white, false);
+            SetRect(arrow.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(27f, 33f));
+            if (right) arrow.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            return button;
         }
 
         // Unlit sprite material so the level needs no 2D lights to be visible.

@@ -23,6 +23,8 @@ namespace TowerDefense
         [SerializeField] private SpriteRenderer previewTower;
         [SerializeField] private SkinSet skin;
         [SerializeField] private Color previewColor = new Color(1f, 1f, 1f, 0.55f);
+        [Tooltip("Visual only (isometric skin): material of the placement puff particles.")]
+        [SerializeField] private Material puffMaterial;
         [SerializeField] private Sprite squareHighlight;
         [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
@@ -128,6 +130,8 @@ namespace TowerDefense
             // because enemies may have moved since the hover result was cached.
             if (mouse.leftButton.wasPressedThisFrame && free && affordable)
                 TryPlaceTower(cell);
+            else if (mouse.leftButton.wasPressedThisFrame && grid.IsBlocked(cell))
+                messages.Show("Cannot build on a wall"); // Message only: a tower already stands here.
         }
 
         private bool TryGetHoveredCell(Mouse mouse, out Vector2Int cell)
@@ -222,6 +226,12 @@ namespace TowerDefense
 
             // The real change: raises GridChanged -> every enemy and the path view re-path.
             grid.SetBlocked(cell, true);
+
+            // Visual only (isometric skin): a tiny dust puff around the new tower's feet.
+            Sprite puff = skin != null && grid.ProjectionType == GridProjectionType.Isometric ? skin.Get(SkinSlot.Puff) : null;
+            if (puff != null)
+                PuffEffect.Spawn(puff, puffMaterial, grid.CellToWorld(cell),
+                    DepthSorter.OrderFor(grid.SortKey(cell), cell, DepthSorter.PartBarFill), cell.x * 31 + cell.y * 17);
             return true;
         }
 

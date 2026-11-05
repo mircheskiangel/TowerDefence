@@ -26,5 +26,11 @@ namespace TowerDefense
         GrassDetail,    // variants, tuft/flower overlay on a grass tile (pivot: center)
         GruntShadow,    // contact shadow under the Grunt ball (pivot: center = feet)
         TankShadow,     // contact shadow under the Tank ball
+        HealthBarFrame, // 9-sliced dark border + dark-red track of the enemy health bar
+        PortalGlow,     // pulsing halo laid over the spawn portal
+        Puff,           // dust particle of the tower placement puff
+        IconCoin,       // HUD icons
+        IconHeart,
+        IconArrow,      // left arrow; the right one is mirrored
     }
 }

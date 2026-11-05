@@ -44,6 +44,14 @@ namespace TowerDefense
         [Header("HUD")]
         public Sprite hudPanel;
         public Sprite hudButton;
+        public Sprite iconCoin;
+        public Sprite iconHeart;
+        public Sprite iconArrow;
+
+        [Header("Effects")]
+        public Sprite healthBarFrame;
+        public Sprite portalGlow;
+        public Sprite puff;
 
         [Header("Backdrop")]
         public Sprite background;
@@ -74,6 +82,12 @@ namespace TowerDefense
                 case SkinSlot.GrassDetail: return Pick(grassDetails, variant);
                 case SkinSlot.GruntShadow: return gruntShadow;
                 case SkinSlot.TankShadow: return tankShadow;
+                case SkinSlot.HealthBarFrame: return healthBarFrame;
+                case SkinSlot.PortalGlow: return portalGlow;
+                case SkinSlot.Puff: return puff;
+                case SkinSlot.IconCoin: return iconCoin;
+                case SkinSlot.IconHeart: return iconHeart;
+                case SkinSlot.IconArrow: return iconArrow;
                 default: return null;
             }
         }
@@ -118,6 +132,8 @@ namespace TowerDefense
             towerBody = towerBase = towerShadow = projectile = null;
             grunt = tank = null;
             hudPanel = hudButton = null;
+            iconCoin = iconHeart = iconArrow = null;
+            healthBarFrame = portalGlow = puff = null;
             background = null;
             grassPeriod = 0;
         }
