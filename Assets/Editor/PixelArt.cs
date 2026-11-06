@@ -250,6 +250,84 @@ namespace TowerDefense.EditorTools
                 Put(cx - r / 3, cy - r / 2 + 1, cream);
             }
 
+            // Filled rectangle, corners included (reference rect()).
+            public void FillRect(int x0, int y0, int x1, int y1, Color32 c)
+            {
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                        Put(x, y, c);
+            }
+
+            // Ellipse shaded with a 4-tone ramp, lit from the upper left (reference ell()).
+            // Center and radii may be fractional; pixels are tested at their centers.
+            public void ShadedEllipse(float cx, float cy, float rx, float ry, Color32[] ramp)
+            {
+                float[] thresholds = { 0f, 0.36f, 0.72f };
+                for (int y = (int)(cy - ry - 1f); y < (int)(cy + ry + 2f); y++)
+                    for (int x = (int)(cx - rx - 1f); x < (int)(cx + rx + 2f); x++)
+                    {
+                        float nx = (x + 0.5f - cx) / rx, ny = (y + 0.5f - cy) / ry;
+                        if (nx * nx + ny * ny > 1f) continue;
+                        float nz = Mathf.Sqrt(Mathf.Max(0f, 1f - nx * nx - ny * ny));
+                        float light = nx * -0.5f + ny * -0.6f + nz * 0.62f;
+                        Put(x, y, RampShade(ramp, light, thresholds));
+                    }
+            }
+
+            // One-pixel line (reference line()).
+            public void Line(float x0, float y0, float x1, float y1, Color32 c)
+            {
+                int n = (int)Mathf.Max(Mathf.Abs(x1 - x0), Mathf.Abs(y1 - y0)) * 2 + 1;
+                for (int i = 0; i <= n; i++)
+                    Put((int)(x0 + (x1 - x0) * i / n), (int)(y0 + (y1 - y0) * i / n), c);
+            }
+
+            // Polygon with its edge pixels included (the reference draws small shapes such as ears
+            // and tusks this way; FillPolygon alone covers only the pixels whose center is inside).
+            public void FillPolygonWithEdges(Vector2[] points, Color32 c)
+            {
+                FillPolygon(points, c);
+                for (int i = 0, j = points.Length - 1; i < points.Length; j = i++)
+                    Line(points[j].x, points[j].y, points[i].x, points[i].y, c);
+            }
+
+            // Outline pass: every empty pixel next to a filled one becomes 'c' (reference outline()).
+            public void Outline(Color32 c)
+            {
+                var edge = new bool[Width * Height];
+                for (int y = 0; y < Height; y++)
+                    for (int x = 0; x < Width; x++)
+                    {
+                        if (Get(x, y).a != 0) continue;
+                        edge[y * Width + x] = Get(x + 1, y).a != 0 || Get(x - 1, y).a != 0
+                                              || Get(x, y + 1).a != 0 || Get(x, y - 1).a != 0;
+                    }
+                for (int i = 0; i < edge.Length; i++)
+                    if (edge[i]) { c.a = 255; pixels[i] = c; }
+            }
+
+            // First and last rows that hold any pixel (-1 when the canvas is empty).
+            public void OpaqueRows(out int first, out int last)
+            {
+                first = last = -1;
+                for (int y = 0; y < Height; y++)
+                    for (int x = 0; x < Width; x++)
+                        if (Get(x, y).a != 0)
+                        {
+                            if (first < 0) first = y;
+                            last = y;
+                            break;
+                        }
+            }
+
+            // New canvas holding rows firstRow..lastRow of this one (same width).
+            public PixelCanvas CropRows(int firstRow, int lastRow)
+            {
+                var cropped = new PixelCanvas(Width, lastRow - firstRow + 1);
+                System.Array.Copy(pixels, firstRow * Width, cropped.pixels, 0, cropped.pixels.Length);
+                return cropped;
+            }
+
             // Calls 'paint(dx, dy, d)' for every pixel of a 2:1 diamond centered on (cx, cy)
             // with half sizes halfW x halfH; d is the diamond distance (0 center .. 1 edge).
             public void ForEachDiamondPixel(int cx, int cy, int halfW, int halfH, System.Action<int, int, float> paint)

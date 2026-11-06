@@ -36,6 +36,12 @@ namespace TowerDefense
         public Sprite gruntShadow;
         public Sprite tankShadow;
 
+        [Header("Enemy characters (walk frames, facing right)")]
+        public Sprite[] gruntWalk = new Sprite[0];
+        public Sprite[] tankWalk = new Sprite[0];
+        public Sprite gruntCharacterShadow;
+        public Sprite tankCharacterShadow;
+
         [Header("Decoration")]
         public Sprite[] trees = new Sprite[0];
         public Sprite[] rocks = new Sprite[0];
@@ -82,6 +88,10 @@ namespace TowerDefense
                 case SkinSlot.GrassDetail: return Pick(grassDetails, variant);
                 case SkinSlot.GruntShadow: return gruntShadow;
                 case SkinSlot.TankShadow: return tankShadow;
+                case SkinSlot.GruntWalk: return Pick(gruntWalk, variant);
+                case SkinSlot.TankWalk: return Pick(tankWalk, variant);
+                case SkinSlot.GruntCharacterShadow: return gruntCharacterShadow;
+                case SkinSlot.TankCharacterShadow: return tankCharacterShadow;
                 case SkinSlot.HealthBarFrame: return healthBarFrame;
                 case SkinSlot.PortalGlow: return portalGlow;
                 case SkinSlot.Puff: return puff;
@@ -100,6 +110,8 @@ namespace TowerDefense
                 case SkinSlot.GrassTile: return Count(grassTiles);
                 case SkinSlot.PathTile: return Count(pathTiles);
                 case SkinSlot.GrassDetail: return Count(grassDetails);
+                case SkinSlot.GruntWalk: return Count(gruntWalk);
+                case SkinSlot.TankWalk: return Count(tankWalk);
                 case SkinSlot.Tree: return Count(trees);
                 case SkinSlot.Rock: return Count(rocks);
                 case SkinSlot.Bush: return Count(bushes);
@@ -124,6 +136,9 @@ namespace TowerDefense
             pathTiles = new Sprite[0];
             grassDetails = new Sprite[0];
             gruntShadow = tankShadow = null;
+            gruntWalk = new Sprite[0];
+            tankWalk = new Sprite[0];
+            gruntCharacterShadow = tankCharacterShadow = null;
             trees = new Sprite[0];
             rocks = new Sprite[0];
             bushes = new Sprite[0];

@@ -186,6 +186,7 @@ GameObject:
   - component: {fileID: 6028211720464086969}
   - component: {fileID: 8005584510845586968}
   - component: {fileID: 2313974404733689699}
+  - component: {fileID: 5086427299070946352}
   - component: {fileID: 959518864089074736}
   m_Layer: 0
   m_Name: Enemy
@@ -286,6 +287,22 @@ MonoBehaviour:
   amplitude: 0.0234375
   hopsPerCell: 2
   settleSpeed: 8
+--- !u!114 &5086427299070946352
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3938116422783030630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ada9e04affdda541a042026dd2163b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.EnemyWalkAnimator
+  enemy: {fileID: 1394283283964334348}
+  look: {fileID: 8005584510845586968}
+  body: {fileID: 3241556720830223821}
+  skin: {fileID: 11400000, guid: 4427a894b2a2b1a4ab1b8e00a82ee8e9, type: 2}
 --- !u!114 &959518864089074736
 MonoBehaviour:
   m_ObjectHideFlags: 0

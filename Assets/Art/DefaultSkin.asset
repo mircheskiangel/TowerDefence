@@ -55,6 +55,14 @@ MonoBehaviour:
   tank: {fileID: 21300000, guid: 919d5bc6d3b101a4aab4bc6835a5795a, type: 3}
   gruntShadow: {fileID: 21300000, guid: 681701b9a47a97c468348f117edb09ac, type: 3}
   tankShadow: {fileID: 21300000, guid: 66386c34ab9449e4bb90b94e0a110307, type: 3}
+  gruntWalk:
+  - {fileID: 21300000, guid: 13b7c38c4df168347b72e3e215ea2b11, type: 3}
+  - {fileID: 21300000, guid: 6c31bafd95e1f91409ce5fe2445535e1, type: 3}
+  tankWalk:
+  - {fileID: 21300000, guid: ab439a1fd6a0c92409f7a38c5b714cf6, type: 3}
+  - {fileID: 21300000, guid: a840aa8c0eebc3f47bd84bf1a7448680, type: 3}
+  gruntCharacterShadow: {fileID: 21300000, guid: b290b10db5f56d34da962f155035bf6f, type: 3}
+  tankCharacterShadow: {fileID: 21300000, guid: 5255b0d253c491345a20beea6e1d9a71, type: 3}
   trees:
   - {fileID: 21300000, guid: 27409e34daa0e4040abb57ca35da2283, type: 3}
   - {fileID: 21300000, guid: 18c480f2505b3d740864435a5cd54cf3, type: 3}

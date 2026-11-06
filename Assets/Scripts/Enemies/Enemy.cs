@@ -89,12 +89,8 @@ namespace TowerDefense
             transform.localScale = Vector3.one * data.scale * grid.CellSize;
             if (body == null) body = GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = data.color;
-            if (look != null)
-            {
-                look.SetTint(data.color);
-                look.SetIsometricSlot(data.skinSlot);
-            }
-            if (shadowSkin != null) shadowSkin.SetSlot(data.skinShadowSlot);
+            if (look != null) look.SetTint(data.color);
+            ApplySkinSlots();
             if (healthBar != null) healthBar.SetSkinnedWidth(data.healthBarPixels);
             if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
             if (hitFlash != null) hitFlash.SetBaseColor(body != null ? body.color : data.color); // Tint or untinted skin.
@@ -128,6 +124,7 @@ namespace TowerDefense
             if (subscribed || grid == null) return;
             grid.GridChanged += Repath;
             grid.ProjectionChanged += SnapViewToGrid;
+            EnemySkinSettings.Changed += RefreshSkin;
             subscribed = true;
         }
 
@@ -139,6 +136,7 @@ namespace TowerDefense
                 grid.GridChanged -= Repath;
                 grid.ProjectionChanged -= SnapViewToGrid;
             }
+            EnemySkinSettings.Changed -= RefreshSkin;
             subscribed = false;
         }
 
@@ -157,6 +155,24 @@ namespace TowerDefense
             if (hitFlash != null && body != null) hitFlash.SetBaseColor(body.color);
             if (healthBar != null) healthBar.Layout();
             if (depth != null) depth.Refresh();
+        }
+
+        // Visual only: the isometric sprite and shadow slots for the current enemy skin style.
+        private void ApplySkinSlots()
+        {
+            bool characters = EnemySkinSettings.Style == EnemySkinStyle.Characters;
+            if (look != null) look.SetIsometricSlot(characters ? data.walkSlot : data.skinSlot);
+            if (shadowSkin != null) shadowSkin.SetSlot(characters ? data.characterShadowSlot : data.skinShadowSlot);
+        }
+
+        // Visual only: the K key switched the skin style.
+        private void RefreshSkin()
+        {
+            if (this == null || data == null) return;
+            ApplySkinSlots();
+            if (look != null) look.Apply(grid);
+            if (hitFlash != null && body != null) hitFlash.SetBaseColor(body.color);
+            if (healthBar != null) healthBar.Layout();
         }
 
         // Recomputes the path from the cell we occupy now to the goal.

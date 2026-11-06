@@ -2,7 +2,8 @@ using UnityEngine;
 
 namespace TowerDefense
 {
-    // Visual only: a slight vertical bob of the enemy's ball while it walks (isometric view).
+    // Visual only: a slight vertical bob of the enemy's ball while it walks (isometric view, Balls
+    // style; characters have the bob in their walk frames, see EnemyWalkAnimator).
     // It moves only the visual child ('ball'); the enemy's position, its contact shadow, its
     // health bar and its draw order are untouched. The bob follows the distance walked, so an
     // enemy that stands still (waiting for a path) settles back onto the ground. In top-down
@@ -34,7 +35,7 @@ namespace TowerDefense
             lastPosition = position;
             hasLast = true;
 
-            if (!iso)
+            if (!iso || EnemySkinSettings.Style != EnemySkinStyle.Balls)
             {
                 height = 0f;
                 ball.localPosition = Vector3.zero;

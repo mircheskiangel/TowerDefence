@@ -8,7 +8,7 @@ namespace TowerDefense.EditorTools
     // Assets/Art/Generated/ by file name. A missing file leaves its slot empty, so the object
     // keeps its built-in sprite. File names (variant slots count up from 0 until a gap):
     //   Grass_0.png, Grass_1.png, ...   GrassDetail_0..   Path_0..   Tree_0..   Rock_0..   Bush_0..
-    //   GruntShadow, TankShadow,
+    //   GoblinWalk_0.., OgreWalk_0.., GoblinShadow, OgreShadow, GruntShadow, TankShadow,
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
     //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background, HealthBarFrame,
     //   SpawnPortalGlow, Puff, IconCoin, IconHeart, IconArrow
@@ -47,6 +47,10 @@ namespace TowerDefense.EditorTools
                 skin.tank = Load(folder, "Tank", ref count);
                 skin.gruntShadow = Load(folder, "GruntShadow", ref count);
                 skin.tankShadow = Load(folder, "TankShadow", ref count);
+                skin.gruntWalk = LoadVariants(folder, "GoblinWalk", ref count);
+                skin.tankWalk = LoadVariants(folder, "OgreWalk", ref count);
+                skin.gruntCharacterShadow = Load(folder, "GoblinShadow", ref count);
+                skin.tankCharacterShadow = Load(folder, "OgreShadow", ref count);
                 skin.cliffLeft = Load(folder, "CliffLeft", ref count);
                 skin.cliffRight = Load(folder, "CliffRight", ref count);
                 skin.projectile = Load(folder, "Projectile", ref count);

@@ -20,4 +20,7 @@ MonoBehaviour:
   scale: 0.8
   skinSlot: 9
   skinShadowSlot: 21
+  walkSlot: 29
+  characterShadowSlot: 31
+  walkFrameSeconds: 0.3
   healthBarPixels: 27

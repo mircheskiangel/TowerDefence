@@ -19,6 +19,12 @@ namespace TowerDefense
         public SkinSlot skinSlot = SkinSlot.Grunt;
         [Tooltip("Visual only: SkinSet slot of the contact shadow in the isometric view.")]
         public SkinSlot skinShadowSlot = SkinSlot.GruntShadow;
+        [Tooltip("Visual only: SkinSet slot of the character walk frames (Characters style).")]
+        public SkinSlot walkSlot = SkinSlot.GruntWalk;
+        [Tooltip("Visual only: SkinSet slot of the character ground shadow (Characters style).")]
+        public SkinSlot characterShadowSlot = SkinSlot.GruntCharacterShadow;
+        [Tooltip("Visual only: seconds per walk frame at this enemy's normal speed.")]
+        [Min(0.01f)] public float walkFrameSeconds = 0.18f;
         [Tooltip("Visual only: health bar fill width in pixels when skinned (isometric).")]
         [Min(4)] public int healthBarPixels = 18;
     }

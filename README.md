@@ -53,6 +53,7 @@ so references stay valid). All balance numbers are set in `LevelBuilder.cs`.
 | Hover over a cell where a tower can be placed, or over an existing tower | Shows the tower's range circle |
 | **P** | Show / hide the debug line of the current A\* path from spawn to goal |
 | **V** | Switch the view: isometric (default) ↔ top-down |
+| **K** | Switch the enemy skin in the isometric view: characters (default) ↔ balls. Visual only; affects live and future enemies |
 | **T** | Cycle the targeting mode of **all** towers: First → Closest → Strongest → Weakest |
 | **◀ / ▶** buttons (isometric HUD, top right) | Previous / next targeting mode |
 | **Space** | Skip the countdown before the next wave |
@@ -113,7 +114,7 @@ All runtime code is in `Assets/Scripts/` under the namespace `TowerDefense`.
 | `Core` | `GameManager` (state machine Playing / Won / Lost, restart), `PlayerResources` (gold, lives), `LivesHandler` (1 life per enemy at the goal), `CameraFitter` (fits the board in either view), `ProjectionSwitcher` (V key) |
 | `Grid` | `GridManager` (cells, blocked cells, spawn / goal, owns the active projection), `IGridProjection`, `TopDownProjection`, `IsometricProjection`, `GridProjectionType`, `BoardView` (floor, ring, cliffs, backdrop, decoration, spawn / goal markers or portal and gate), `RoadView` (isometric dirt road on the current path), `ProjectionLook` (per-view sprite, isometric-only parts), `DepthSorter` (isometric draw order), `GlowPulse` |
 | `Pathfinding` | `AStarPathfinder`, `MinHeap` (binary heap), `PathDebugView` (P key) |
-| `Enemies` | `Enemy` (movement, re-pathing, health), `EnemyRegistry` (list of active enemies), `EnemyHitFlash`, `EnemyHealthBar`, `EnemyBob`, `VisualFade` (death fade) |
+| `Enemies` | `Enemy` (movement, re-pathing, health), `EnemyRegistry` (list of active enemies), `EnemyHitFlash`, `EnemyHealthBar`, `EnemyBob` (balls only), `EnemyWalkAnimator` (character frames and flip), `EnemySkinSettings` (`EnemySkinStyle`), `EnemySkinSwitcher` (K key), `VisualFade` (death fade) |
 | `Towers` | `Tower` (scan, fire), `TowerPlacer` (mouse placement + path-blocked check, hover highlight), `Projectile`, `RangeIndicator` (range circle / ellipse), `PuffEffect` (placement puff) |
 | `Towers/Targeting` | `TargetingMode`, `ITargetSelector`, `TargetSelectors` (the four strategies), `TargetingSettings` (global mode), `TargetingModeSwitcher` (T key) |
 | `Waves` | `WaveManager` (countdowns, spawning coroutine, wave-cleared check) |
@@ -232,8 +233,9 @@ the skin:
 - **Fixed seeds** everywhere (no `UnityEngine.Random`), so a rebuild writes byte-identical PNGs.
 - `Assets/Art/DefaultSkin.asset` is a `SkinSet` (`Assets/Scripts/Skins/`): named slots for grass,
   grass details, path, cliffs, portal, portal glow, gate, backdrop, decoration (trees, rocks,
-  bushes), tower body / base / shadow, Grunt, Tank and their shadows, projectile, health bar frame,
-  placement puff and HUD parts. `SkinLoader` fills the slots from the PNGs by file name.
+  bushes), tower body / base / shadow, Grunt, Tank and their shadows, the character slots `GruntWalk`,
+  `TankWalk` (2 walk frames each), `GruntCharacterShadow`, `TankCharacterShadow`, projectile, health
+  bar frame, placement puff and HUD parts. `SkinLoader` fills the slots from the PNGs by file name.
 - **Every slot is optional.** An empty slot falls back to the plain M7 look for that part, and the
   top-down view never uses skins.
 
@@ -257,9 +259,25 @@ icons, `WAVE 1 / 5`, the targeting selector with arrow buttons, a tower card (ic
 bottom message panel ("Path blocked!", "Cannot build on a wall", the wave countdown). Top-down keeps
 the original labels.
 
-Small visual-only effects (isometric): hit flash (light red tint on the ball), a short fade when an
-enemy dies, a slow pulse of the portal glow, a dust puff when a tower is placed, and a slight bob of
-the walking balls.
+**Enemy characters (isometric).** The Grunt is a goblin (yellow skin, brown tunic, pointed ears,
+dagger) and the Tank an ogre (purple skin, steel shoulder plates, belt, tusks, round shield), ported
+from `Reference/enemy_skins_reference.py` into `IsoArt` and saved as `GoblinWalk_0/1`, `OgreWalk_0/1`,
+`GoblinShadow` and `OgreShadow`. All frames face right, with the pivot at the feet.
+
+- **Scale:** drawn at the native 64 pixels per unit, so they share the pixel grid of the rest of the
+  art: about 26 x 25 px for the goblin and 37 x 36 px for the ogre, against 21 and 33 px for the balls.
+- **Skin style:** `EnemySkinSettings` holds the style (`Characters` by default, or `Balls`); the
+  **K** key switches it. The balls keep their own slots. Top-down always draws the plain circles.
+- **Walk animation:** `EnemyWalkAnimator` changes only the visual child. Frames follow the distance
+  walked, so the rate scales with speed and a standing enemy stops animating: one frame lasts 0.18 s
+  (Grunt) or 0.30 s (Tank) at normal speed. The body bob is part of the frames; balls keep `EnemyBob`.
+- **Facing:** the sprite is mirrored when the projected movement goes left on screen, which in
+  isometric means both +cy and -cx. A move with no horizontal part keeps the current facing.
+- **Gameplay:** radius, speed, health and gold are unchanged, and the root transform never animates.
+
+Small visual-only effects (isometric): hit flash (light red tint on the character or ball), a short
+fade when an enemy dies (the copy keeps the current frame and flip), a slow pulse of the portal glow,
+a dust puff when a tower is placed, and a slight bob of the walking balls.
 
 The `Reference/` (art reference) and `Screenshots/` folders are git-ignored.
 

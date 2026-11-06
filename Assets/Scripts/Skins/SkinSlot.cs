@@ -32,5 +32,9 @@ namespace TowerDefense
         IconCoin,       // HUD icons
         IconHeart,
         IconArrow,      // left arrow; the right one is mirrored
+        GruntWalk,      // variants = walk frames of the goblin (pivot: feet, facing right)
+        TankWalk,       // variants = walk frames of the ogre (pivot: feet, facing right)
+        GruntCharacterShadow, // ground shadow under the goblin
+        TankCharacterShadow,  // ground shadow under the ogre
     }
 }

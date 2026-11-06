@@ -51,6 +51,7 @@ namespace TowerDefense.EditorTools
             Tower();
             TowerShadow();
             GenerateEnemies(EnemyScale);
+            GenerateCharacters();
             Projectile();
             PortalGlow();
             HealthBarFrame();
@@ -60,6 +61,16 @@ namespace TowerDefense.EditorTools
             IconCoin();
             IconHeart();
             IconArrow();
+        }
+
+        // Goblin (Grunt) and ogre (Tank): 2 walk frames each, facing right, and a ground shadow
+        // per type. Native pixel size (64 px = 1 unit), the same pixel grid as the terrain.
+        public static void GenerateCharacters()
+        {
+            SaveWalkFrames("GoblinWalk", Goblin(0), Goblin(1), GoblinPivotX);
+            SaveWalkFrames("OgreWalk", Ogre(0), Ogre(1), OgrePivotX);
+            EllipseShadow("GoblinShadow", 9, 4);
+            EllipseShadow("OgreShadow", 15, 5);
         }
 
         // Grunt and Tank balls with their contact shadows; 'scale' multiplies the reference radii.
@@ -452,6 +463,121 @@ namespace TowerDefense.EditorTools
             c.FillPolygon(Pts(x, y, -6, -30, 6, -30, 6, -10, 0, -5, -6, -10), Rgb(190, 36, 40));
             c.FillPolygon(Pts(x, y, -2, -22, 2, -22, 2, -18, -2, -18), Rgb(240, 236, 230));
             SaveSprite(c, "GoalGate", PivotAt(c, x, y + 1));
+        }
+
+        // ------------------------------------------------------------ Characters
+        // Ported from Reference/enemy_skins_reference.py: shapes, 4-tone ramps and a dark outline
+        // pass. The legs alternate between the frames and the body bobs 1 px. Both face right
+        // (pupils, dagger and shield on the right); SpriteRenderer.flipX mirrors them.
+
+        private const int GoblinPivotX = 13, OgrePivotX = 20; // Body center, so a flip stays in place.
+
+        // Crops both frames to the same rows, from the head of the higher frame down to the feet,
+        // so the sprite's top is the top of the head (the health bar sits right above it) and
+        // does not change between frames. Pivot at the feet (bottom edge, body center).
+        private static void SaveWalkFrames(string name, PixelCanvas frame0, PixelCanvas frame1, int pivotX)
+        {
+            frame0.OpaqueRows(out int first0, out int last0);
+            frame1.OpaqueRows(out int first1, out int last1);
+            int first = Mathf.Min(first0, first1), last = Mathf.Max(last0, last1);
+            PixelCanvas a = frame0.CropRows(first, last), b = frame1.CropRows(first, last);
+            Vector2 pivot = PivotAt(a, pivotX, a.Height);
+            SaveSprite(a, $"{name}_0", pivot);
+            SaveSprite(b, $"{name}_1", pivot);
+        }
+
+        private static PixelCanvas Goblin(int frame)
+        {
+            Color32[] skin = { Rgb(150, 92, 10), Rgb(214, 150, 22), Rgb(244, 200, 48), Rgb(255, 232, 110) };
+            Color32[] tunic = { Rgb(70, 42, 26), Rgb(104, 66, 40), Rgb(132, 88, 54), Rgb(160, 112, 70) };
+            Color32[] steel = { Rgb(60, 62, 72), Rgb(98, 102, 114), Rgb(140, 146, 158), Rgb(190, 196, 208) };
+            Color32 outline = Rgb(40, 24, 10), shoe = Rgb(50, 34, 22);
+            var c = new PixelCanvas(26, 30);
+            int bob = frame == 1 ? 1 : 0, liftLeft = frame == 0 ? 0 : 1, liftRight = frame == 1 ? 0 : 1;
+            // Legs: the lifted one is a pixel shorter.
+            c.FillRect(9, 22, 11, 25 - liftLeft, tunic[0]);
+            c.FillRect(9, 25 - liftLeft, 12, 26 - liftLeft, shoe);
+            c.FillRect(14, 22, 16, 25 - liftRight, tunic[1]);
+            c.FillRect(14, 25 - liftRight, 17, 26 - liftRight, shoe);
+            // Back arm, body, belt with buckle.
+            c.ShadedEllipse(7, 18 - bob, 2.2f, 3f, skin);
+            c.ShadedEllipse(13, 19 - bob, 5.5f, 5.2f, tunic);
+            c.FillRect(9, 21 - bob, 17, 21 - bob, Rgb(40, 30, 20));
+            c.Put(13, 21 - bob, Rgb(220, 190, 70));
+            // Front arm with the dagger.
+            c.Line(19, 17 - bob, 23, 11 - bob, steel[2]);
+            c.Line(19, 16 - bob, 23, 10 - bob, steel[3]);
+            c.FillRect(18, 17 - bob, 19, 17 - bob, Rgb(90, 60, 40));
+            c.ShadedEllipse(19, 18 - bob, 2.2f, 2.6f, skin);
+            // Pointed ears, head.
+            c.FillPolygonWithEdges(new[] { new Vector2(7, 11 - bob), new Vector2(1, 7 - bob), new Vector2(7, 14 - bob) }, skin[2]);
+            c.FillPolygonWithEdges(new[] { new Vector2(19, 11 - bob), new Vector2(25, 7 - bob), new Vector2(19, 14 - bob) }, skin[1]);
+            c.ShadedEllipse(13, 11 - bob, 6.5f, 5.6f, skin);
+            // Face: eyes looking right, brows, mouth with two teeth.
+            c.FillRect(10, 10 - bob, 11, 11 - bob, Rgb(255, 255, 255));
+            c.FillRect(15, 10 - bob, 16, 11 - bob, Rgb(255, 255, 255));
+            c.Put(11, 11 - bob, Rgb(30, 10, 10));
+            c.Put(16, 11 - bob, Rgb(30, 10, 10));
+            c.Line(9, 8 - bob, 12, 9 - bob, outline);
+            c.Line(17, 8 - bob, 14, 9 - bob, outline);
+            c.FillRect(11, 14 - bob, 15, 14 - bob, Rgb(70, 30, 20));
+            c.Put(12, 15 - bob, Rgb(250, 250, 240));
+            c.Put(14, 15 - bob, Rgb(250, 250, 240));
+            c.Outline(outline);
+            return c;
+        }
+
+        private static PixelCanvas Ogre(int frame)
+        {
+            Color32[] skin = { Rgb(64, 32, 104), Rgb(106, 60, 152), Rgb(146, 92, 198), Rgb(190, 146, 238) };
+            Color32[] steel = { Rgb(60, 62, 72), Rgb(98, 102, 114), Rgb(140, 146, 158), Rgb(190, 196, 208) };
+            Color32[] wood = { Rgb(70, 44, 26), Rgb(104, 70, 42), Rgb(134, 94, 58), Rgb(160, 118, 78) };
+            Color32 boot = Rgb(48, 40, 36), tusk = Rgb(250, 248, 236);
+            var c = new PixelCanvas(40, 44);
+            int bob = frame == 1 ? 1 : 0, liftLeft = frame == 0 ? 1 : 0, liftRight = frame == 1 ? 1 : 0;
+            // Legs with boots: the lifted one is a pixel shorter.
+            c.FillRect(11, 32, 16, 38 - liftLeft, skin[0]);
+            c.FillRect(10, 38 - liftLeft, 17, 40 - liftLeft, boot);
+            c.FillRect(23, 32, 28, 38 - liftRight, skin[1]);
+            c.FillRect(22, 38 - liftRight, 29, 40 - liftRight, boot);
+            // Back arm fist, body, belt with buckle.
+            c.ShadedEllipse(7, 29 - bob, 3.6f, 5f, skin);
+            c.ShadedEllipse(20, 27 - bob, 11f, 9f, skin);
+            c.FillRect(11, 30 - bob, 29, 32 - bob, Rgb(70, 66, 62));
+            c.FillRect(18, 30 - bob, 22, 32 - bob, Rgb(210, 170, 60));
+            // Round shield on the front arm.
+            c.ShadedEllipse(32, 29 - bob, 6f, 6.4f, wood);
+            c.ShadedEllipse(32, 29 - bob, 2.2f, 2.4f, steel);
+            c.ShadedEllipse(33, 27 - bob, 3f, 3f, skin);
+            // Steel shoulder plates with rivets.
+            c.ShadedEllipse(10, 20 - bob, 5f, 3.6f, steel);
+            c.ShadedEllipse(30, 20 - bob, 5f, 3.6f, steel);
+            foreach (int px in new[] { 8, 12, 28, 32 })
+            {
+                c.Put(px, 16 - bob, steel[3]);
+                c.Put(px, 17 - bob, steel[2]);
+            }
+            // Head: yellow eyes looking right, brows, mouth and two tusks.
+            c.ShadedEllipse(20, 14 - bob, 6.8f, 6f, skin);
+            c.FillRect(16, 12 - bob, 18, 13 - bob, Rgb(255, 230, 120));
+            c.FillRect(22, 12 - bob, 24, 13 - bob, Rgb(255, 230, 120));
+            c.Put(17, 13 - bob, Rgb(120, 10, 10));
+            c.Put(23, 13 - bob, Rgb(120, 10, 10));
+            c.Line(15, 10 - bob, 19, 12 - bob, Rgb(30, 10, 40));
+            c.Line(25, 10 - bob, 21, 12 - bob, Rgb(30, 10, 40));
+            c.FillRect(17, 18 - bob, 23, 18 - bob, Rgb(50, 20, 60));
+            c.FillPolygonWithEdges(new[] { new Vector2(17, 18 - bob), new Vector2(16, 15 - bob), new Vector2(18, 18 - bob) }, tusk);
+            c.FillPolygonWithEdges(new[] { new Vector2(23, 18 - bob), new Vector2(24, 15 - bob), new Vector2(22, 18 - bob) }, tusk);
+            c.Outline(Rgb(26, 12, 40));
+            return c;
+        }
+
+        // Soft ground shadow with explicit radii, centered on the feet (per enemy type).
+        private static void EllipseShadow(string name, int rx, int ry)
+        {
+            var c = new PixelCanvas(2 * rx + 4, 2 * ry + 4);
+            c.Shadow(rx + 2, ry + 2, rx, ry, 0.4f);
+            SaveSprite(c, name, PivotAt(c, rx + 2.5f, ry + 2.5f));
         }
 
         // ------------------------------------------------------------ Tower, enemies, projectile

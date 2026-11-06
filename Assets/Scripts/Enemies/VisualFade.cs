@@ -28,7 +28,8 @@ namespace TowerDefense
                 go.transform.position = src.transform.position;
                 go.transform.localScale = src.transform.lossyScale;
                 SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = src.sprite;
+                sr.sprite = src.sprite; // The current walk frame...
+                sr.flipX = src.flipX;   // ...and the current facing.
                 sr.sharedMaterial = src.sharedMaterial;
                 sr.color = src.color;
                 sr.sortingOrder = src.sortingOrder;

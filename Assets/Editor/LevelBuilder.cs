@@ -120,9 +120,11 @@ namespace TowerDefense.EditorTools
             Sprite shadow = CreateShadowSprite("Shadow");
             Material spriteMaterial = CreateSpriteMaterial();
             EnemySO grunt = CreateEnemyData("Grunt", maxHealth: 76f, moveSpeed: 2.3f, goldReward: 4,
-                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f, SkinSlot.Grunt, SkinSlot.GruntShadow, IsoArt.GruntBarPixels);
+                new Color(1.00f, 0.80f, 0.20f), scale: 0.5f, SkinSlot.Grunt, SkinSlot.GruntShadow, IsoArt.GruntBarPixels,
+                SkinSlot.GruntWalk, SkinSlot.GruntCharacterShadow, walkFrameSeconds: 0.18f);
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
-                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank, SkinSlot.TankShadow, IsoArt.TankBarPixels);
+                new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank, SkinSlot.TankShadow, IsoArt.TankBarPixels,
+                SkinSlot.TankWalk, SkinSlot.TankCharacterShadow, walkFrameSeconds: 0.30f);
             CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial, skin);
             List<WaveSO> waves = CreateWaves(grunt, tank);
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
@@ -162,6 +164,7 @@ namespace TowerDefense.EditorTools
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
             SetField(switcher, "grid", grid);
+            new GameObject("EnemySkinSwitcher").AddComponent<EnemySkinSwitcher>();
 
             // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
@@ -859,7 +862,8 @@ namespace TowerDefense.EditorTools
 
         // Creates the EnemySO asset, or updates it in place (same GUID) if it already exists.
         private static EnemySO CreateEnemyData(string name, float maxHealth, float moveSpeed, int goldReward, Color color, float scale,
-            SkinSlot skinSlot, SkinSlot skinShadowSlot, int healthBarPixels)
+            SkinSlot skinSlot, SkinSlot skinShadowSlot, int healthBarPixels,
+            SkinSlot walkSlot, SkinSlot characterShadowSlot, float walkFrameSeconds)
         {
             string path = $"{DataFolder}/{name}.asset";
             EnemySO data = AssetDatabase.LoadAssetAtPath<EnemySO>(path);
@@ -877,6 +881,9 @@ namespace TowerDefense.EditorTools
             data.skinSlot = skinSlot;
             data.skinShadowSlot = skinShadowSlot;
             data.healthBarPixels = healthBarPixels;
+            data.walkSlot = walkSlot;
+            data.characterShadowSlot = characterShadowSlot;
+            data.walkFrameSeconds = walkFrameSeconds;
             EditorUtility.SetDirty(data);
             return data;
         }
@@ -970,6 +977,11 @@ namespace TowerDefense.EditorTools
             EnemyBob bob = go.AddComponent<EnemyBob>();
             SetField(bob, "enemy", enemy);
             SetField(bob, "ball", bodyGo.transform);
+            EnemyWalkAnimator walk = go.AddComponent<EnemyWalkAnimator>();
+            SetField(walk, "enemy", enemy);
+            SetField(walk, "look", look);
+            SetField(walk, "body", body);
+            SetField(walk, "skin", skin);
 
             // Isometric draw order: shadow < body < bar background < bar fill, all by depth.
             DepthSorter depth = go.AddComponent<DepthSorter>();
