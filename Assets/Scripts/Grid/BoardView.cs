@@ -217,7 +217,7 @@ namespace TowerDefense
                 for (int y = 0; y < grid.Height; y++)
                 {
                     Vector2Int cell = new Vector2Int(x, y);
-                    if (!grid.IsPermanent(cell)) continue;
+                    if (!grid.IsWall(cell)) continue;
                     if (walls == null)
                     {
                         walls = new GameObject(WallsName).transform;

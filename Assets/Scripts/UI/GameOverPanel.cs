@@ -7,7 +7,7 @@ namespace TowerDefense
 {
     // The Win/Lose screen. Hidden while playing; when GameManager leaves Playing it shows
     // "YOU WIN!" or "GAME OVER" with a short result line and a Restart button (R also restarts).
-    // A win also offers the next level, or the menu after the last level.
+    // A win also offers the next level, or the menu after the last level; a loss offers the menu.
     // This script sits on an always-active object; only the 'panel' child is shown/hidden.
     public class GameOverPanel : MonoBehaviour
     {
@@ -18,7 +18,7 @@ namespace TowerDefense
         [SerializeField] private TMP_Text title;
         [SerializeField] private TMP_Text detail;
         [SerializeField] private Button restartButton;
-        [Tooltip("Shown only on a win: next level, or the menu after the last level.")]
+        [Tooltip("Next level after a win (the menu after the last level), the menu after a loss.")]
         [SerializeField] private Button nextButton;
         [SerializeField] private TMP_Text nextLabel;
         [SerializeField] private float buttonSpacing = 200f;
@@ -57,7 +57,7 @@ namespace TowerDefense
         {
             if (panel == null) return;
             panel.SetActive(state != GameState.Playing);
-            LayoutButtons(state == GameState.Won && LevelManager.Instance != null);
+            LayoutButtons(state != GameState.Playing && LevelManager.Instance != null);
 
             if (state == GameState.Won)
             {
@@ -73,7 +73,7 @@ namespace TowerDefense
             }
         }
 
-        // Restart alone in the middle (a loss), or Restart and the second button side by side (a win).
+        // Restart and the second button side by side (Restart alone without levels).
         private void LayoutButtons(bool showNext)
         {
             if (nextButton != null) nextButton.gameObject.SetActive(showNext);
@@ -81,7 +81,7 @@ namespace TowerDefense
                 ((RectTransform)restartButton.transform).anchoredPosition = restartHome + (showNext ? Vector2.left * buttonSpacing : Vector2.zero);
             if (!showNext || nextButton == null) return;
             ((RectTransform)nextButton.transform).anchoredPosition = restartHome + Vector2.right * buttonSpacing;
-            if (nextLabel != null) nextLabel.text = LevelManager.Instance.HasNextLevel ? "Next level" : "Menu";
+            if (nextLabel != null) nextLabel.text = gameManager.State == GameState.Won && LevelManager.Instance.HasNextLevel ? "Next level" : "Menu";
         }
 
         private void Restart()
@@ -91,7 +91,9 @@ namespace TowerDefense
 
         private void NextOrMenu()
         {
-            if (LevelManager.Instance != null) LevelManager.Instance.LoadNextOrMenu();
+            if (LevelManager.Instance == null) return;
+            if (gameManager.State == GameState.Won) LevelManager.Instance.LoadNextOrMenu();
+            else LevelManager.Instance.LoadMenu();
         }
     }
 }

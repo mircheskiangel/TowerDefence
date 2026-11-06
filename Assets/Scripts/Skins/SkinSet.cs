@@ -48,6 +48,11 @@ namespace TowerDefense
         public Sprite tankElite;
         public Sprite tankEliteShadow;
 
+        [Header("Siege Cannon")]
+        public Sprite siegeBody;
+        public Sprite siegeShadow;
+        public Sprite siegeProjectile;
+
         [Header("Permanent walls")]
         public Sprite[] walls = new Sprite[0];
         public Sprite wallShadow;
@@ -110,6 +115,9 @@ namespace TowerDefense
                 case SkinSlot.TankElite: return tankElite;
                 case SkinSlot.TankEliteShadow: return tankEliteShadow;
                 case SkinSlot.IconLock: return iconLock;
+                case SkinSlot.SiegeBody: return siegeBody;
+                case SkinSlot.SiegeShadow: return siegeShadow;
+                case SkinSlot.SiegeProjectile: return siegeProjectile;
                 case SkinSlot.HealthBarFrame: return healthBarFrame;
                 case SkinSlot.PortalGlow: return portalGlow;
                 case SkinSlot.Puff: return puff;
@@ -163,6 +171,7 @@ namespace TowerDefense
             tankEliteCharacterShadow = tankElite = tankEliteShadow = null;
             walls = new Sprite[0];
             wallShadow = iconLock = null;
+            siegeBody = siegeShadow = siegeProjectile = null;
             trees = new Sprite[0];
             rocks = new Sprite[0];
             bushes = new Sprite[0];

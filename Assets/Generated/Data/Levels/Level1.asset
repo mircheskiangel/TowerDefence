@@ -27,3 +27,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 00f87664b2af32e4b99ccf27e67d9e45, type: 2}
   - {fileID: 11400000, guid: 533ab76adef95e74fb4e8adc40a7d145, type: 2}
   decorationSeed: 11
+  allowedTowers:
+  - {fileID: 11400000, guid: 2db54453b1b11ee4f867be14a574b5ed, type: 2}
+  fixedTowers: []

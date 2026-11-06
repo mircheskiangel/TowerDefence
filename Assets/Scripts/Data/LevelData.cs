@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,6 +10,14 @@ namespace TowerDefense
     [CreateAssetMenu(menuName = "Tower Defense/Level Data", fileName = "NewLevel")]
     public class LevelData : ScriptableObject
     {
+        // A tower that stands on its cell from the start of the level and can never be changed.
+        [Serializable]
+        public struct FixedTower
+        {
+            public TowerSO tower;
+            public Vector2Int cell;
+        }
+
         public string levelName = "Level";
         [Min(1)] public int width = 16;
         [Min(1)] public int height = 10;
@@ -21,5 +30,9 @@ namespace TowerDefense
         public List<WaveSO> waves = new List<WaveSO>();
         [Tooltip("Fixed seed of the decoration on the ring around the board.")]
         public int decorationSeed = 11;
+        [Tooltip("The tower types the player may buy (only playerBuildable types are ever offered).")]
+        public List<TowerSO> allowedTowers = new List<TowerSO>();
+        [Tooltip("Towers placed at the start: permanent, free, blocking their cell like walls.")]
+        public List<FixedTower> fixedTowers = new List<FixedTower>();
     }
 }

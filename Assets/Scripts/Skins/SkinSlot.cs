@@ -43,5 +43,8 @@ namespace TowerDefense
         TankElite,      // elite Tank ball with a golden rim (Balls style)
         TankEliteShadow,// contact shadow under the elite ball
         IconLock,       // lock of a locked level on the level select screen
+        SiegeBody,      // the Siege Cannon (pivot: feet)
+        SiegeShadow,    // ground shadow under it
+        SiegeProjectile,// its heavy shot (pivot: center)
     }
 }

@@ -22,6 +22,8 @@ namespace TowerDefense
         [SerializeField] private GameManager gameManager;
 
         public LevelData Current { get; private set; }
+        // The tower the player can buy on this level: the first allowed type that is buildable.
+        public TowerSO BuildTower { get; private set; }
         public int CurrentIndex { get; private set; }
         public bool InMenu { get; private set; }
         public int LevelCount => levels.Length;
@@ -37,6 +39,13 @@ namespace TowerDefense
 
             grid.ApplyLevel(Current);
             resources.Configure(Current.startingGold, Current.startingLives);
+            foreach (TowerSO tower in Current.allowedTowers)
+            {
+                if (tower == null || !tower.playerBuildable) continue;
+                BuildTower = tower;
+                break;
+            }
+            placer.SetBuildTower(BuildTower);
             waves.SetWaves(Current.waves);
             board.ApplyLevel(Current);
 

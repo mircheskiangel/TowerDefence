@@ -43,6 +43,25 @@ namespace TowerDefense
         private Vector2Int? cachedCell;
         private bool cachedKeepsPathOpen;
 
+        // The tower type this level lets the player buy. Called by LevelManager before Start.
+        public void SetBuildTower(TowerSO tower)
+        {
+            towerData = tower;
+        }
+
+        // The fixed towers of the level: free, on their permanent cells (the grid has them already,
+        // so GridChanged does not fire and nothing about the path changes).
+        private void SpawnFixedTowers()
+        {
+            if (LevelManager.Instance == null) return;
+            foreach (LevelData.FixedTower entry in LevelManager.Instance.Current.fixedTowers)
+            {
+                Tower tower = Instantiate(towerPrefab, grid.CellToWorld(entry.cell), Quaternion.identity, container);
+                tower.Initialize(entry.tower, entry.cell, grid, true);
+                towers[entry.cell] = tower;
+            }
+        }
+
         private void Start()
         {
             if (grid == null) grid = GridManager.Instance;
@@ -58,6 +77,7 @@ namespace TowerDefense
 
             pathfinder = new AStarPathfinder(grid);
             container = new GameObject("Towers").transform;
+            SpawnFixedTowers();
             ApplyHighlightShape();
             highlight.enabled = false;
             if (rangeIndicator == null) rangeIndicator = rangeCircle.GetComponent<RangeIndicator>();
@@ -137,6 +157,8 @@ namespace TowerDefense
         {
             if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
                 TryPlaceTower(cell);
+            else if (towers.TryGetValue(cell, out Tower tower) && tower != null && tower.IsFixed)
+                messages.Show("This tower is fixed");
             else if (grid.IsPermanent(cell))
                 messages.Show("Cannot build on a wall");
             else if (grid.IsBlocked(cell))
@@ -270,7 +292,7 @@ namespace TowerDefense
         {
             if (previewTower == null) return;
             Sprite sprite = cell.HasValue && skin != null && grid.ProjectionType == GridProjectionType.Isometric
-                ? skin.Get(SkinSlot.TowerBody) : null;
+                ? skin.Get(towerData.bodySlot) : null;
             previewTower.enabled = sprite != null;
             if (sprite == null) return;
             previewTower.sprite = sprite;

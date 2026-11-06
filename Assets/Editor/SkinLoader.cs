@@ -12,7 +12,8 @@ namespace TowerDefense.EditorTools
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
     //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background, HealthBarFrame,
     //   SpawnPortalGlow, Puff, IconCoin, IconHeart, IconArrow, IconLock,
-    //   Wall_0.., WallShadow, OgreEliteWalk_0.., OgreEliteShadow, TankElite, TankEliteShadow
+    //   Wall_0.., WallShadow, OgreEliteWalk_0.., OgreEliteShadow, TankElite, TankEliteShadow,
+    //   SiegeBody, SiegeShadow, SiegeProjectile
     public static class SkinLoader
     {
         // Loads the SkinSet at 'path', or creates it (an existing asset keeps its GUID).
@@ -59,6 +60,9 @@ namespace TowerDefense.EditorTools
                 skin.walls = LoadVariants(folder, "Wall", ref count);
                 skin.wallShadow = Load(folder, "WallShadow", ref count);
                 skin.iconLock = Load(folder, "IconLock", ref count);
+                skin.siegeBody = Load(folder, "SiegeBody", ref count);
+                skin.siegeShadow = Load(folder, "SiegeShadow", ref count);
+                skin.siegeProjectile = Load(folder, "SiegeProjectile", ref count);
                 skin.cliffLeft = Load(folder, "CliffLeft", ref count);
                 skin.cliffRight = Load(folder, "CliffRight", ref count);
                 skin.projectile = Load(folder, "Projectile", ref count);

@@ -25,7 +25,8 @@ namespace TowerDefense
         [SerializeField] private bool drawDebugGrid = true;
 
         private bool[,] blocked;
-        private bool[,] permanent; // Walls of the level: stay blocked whatever happens to 'blocked'.
+        private bool[,] permanent; // Walls and fixed towers: stay blocked whatever happens to 'blocked'.
+        private bool[,] fixedTower; // The permanent cells that hold a fixed tower instead of a wall.
         private IGridProjection projection;
 
         // Raised whenever a cell changes between walkable and blocked.
@@ -107,8 +108,15 @@ namespace TowerDefense
             goalCell = level.goalCell;
             blocked = new bool[width, height];
             permanent = new bool[width, height];
+            fixedTower = new bool[width, height];
             foreach (Vector2Int cell in level.wallCells)
                 if (IsInBounds(cell)) permanent[cell.x, cell.y] = true;
+            foreach (LevelData.FixedTower tower in level.fixedTowers)
+            {
+                if (!IsInBounds(tower.cell)) continue;
+                permanent[tower.cell.x, tower.cell.y] = true;
+                fixedTower[tower.cell.x, tower.cell.y] = true;
+            }
             projection = null;
         }
 
@@ -130,10 +138,16 @@ namespace TowerDefense
             return IsInBounds(cell) && (blocked[cell.x, cell.y] || IsPermanent(cell));
         }
 
-        // A wall of the level: blocked for A*, cannot be built on, sold or replaced.
+        // A wall or a fixed tower of the level: blocked for A*, cannot be built on, sold or replaced.
         public bool IsPermanent(Vector2Int cell)
         {
             return permanent != null && IsInBounds(cell) && permanent[cell.x, cell.y];
+        }
+
+        // A permanent cell that holds a wall (and is drawn as one), not a fixed tower.
+        public bool IsWall(Vector2Int cell)
+        {
+            return IsPermanent(cell) && !fixedTower[cell.x, cell.y];
         }
 
         public void SetBlocked(Vector2Int cell, bool value)

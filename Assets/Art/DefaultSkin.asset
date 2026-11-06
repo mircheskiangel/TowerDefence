@@ -69,6 +69,9 @@ MonoBehaviour:
   tankEliteCharacterShadow: {fileID: 21300000, guid: f91bf90c071203d45839737fee949c51, type: 3}
   tankElite: {fileID: 21300000, guid: cbf930889a1168f4bbbd67c5fa8c40e3, type: 3}
   tankEliteShadow: {fileID: 21300000, guid: e78444eb13492b94ba85eb02d2bcec1e, type: 3}
+  siegeBody: {fileID: 21300000, guid: bfba5aec24c18924caf26ed11838fb8d, type: 3}
+  siegeShadow: {fileID: 21300000, guid: 2a84a8dda5c99334a928d9fb79108171, type: 3}
+  siegeProjectile: {fileID: 21300000, guid: 35caa88b2b6de82489e2aba2d3c47fc1, type: 3}
   walls:
   - {fileID: 21300000, guid: eb9745abe17708c41933f0842d4febae, type: 3}
   - {fileID: 21300000, guid: 01f8d25847ee31b4ca7b03a7ad25f9f8, type: 3}

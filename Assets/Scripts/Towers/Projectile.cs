@@ -16,6 +16,8 @@ namespace TowerDefense
         [SerializeField] private float isometricHeight = 0.35f;
         [SerializeField] private DepthSorter depth;
         [SerializeField] private SkinnedSprite skinned;
+        [Tooltip("Visual only: the short trail of a heavy shot, off unless the tower type asks for it.")]
+        [SerializeField] private TrailRenderer trail;
         [Tooltip("Safety net: the projectile is destroyed after this many seconds no matter what.")]
         [SerializeField] private float maxLifetime = 3f;
 
@@ -26,6 +28,18 @@ namespace TowerDefense
         private Vector2 lastKnownPosition; // Target's last seen position, grid coordinates.
         private bool initialized;
         private GridProjectionType? skinnedFor; // Projection the skinned sprite was last applied for.
+        private bool wantsTrail;
+
+        // Visual only: how the shot of this tower type looks. Call before Initialize.
+        public void SetLook(TowerSO towerType)
+        {
+            if (skinned != null)
+            {
+                skinned.SetSlot(towerType.projectileSlot);
+                skinned.SetFallbackLook(towerType.projectileColor, towerType.projectileScale);
+            }
+            wantsTrail = towerType.projectileTrail;
+        }
 
         public void Initialize(Enemy newTarget, float newDamage, float newSpeed, GridManager gridManager, Vector2 startGridPosition)
         {
@@ -40,6 +54,11 @@ namespace TowerDefense
             {
                 PlaceView();
                 if (depth != null) depth.Initialize(grid, gridPosition);
+                if (trail != null && wantsTrail)
+                {
+                    trail.Clear();
+                    trail.enabled = true;
+                }
             }
             Destroy(gameObject, maxLifetime);
         }
@@ -77,6 +96,7 @@ namespace TowerDefense
             {
                 skinned.Apply(grid); // At spawn and after a V switch mid-flight.
                 skinnedFor = grid.ProjectionType;
+                if (trail != null) trail.Clear(); // No streak across the screen after a V switch.
             }
         }
     }

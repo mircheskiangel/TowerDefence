@@ -7,6 +7,8 @@ namespace TowerDefense
     // and asks the selector for the current global TargetingMode which one to target.
     // It fires a projectile at that target whenever its cooldown (1 / fireRate) is over.
     // Range checks use grid coordinates (the tower's Cell vs. Enemy.GridPosition), never world distances.
+    // One prefab for every type: stats and look come from TowerSO. A fixed tower only differs by what
+    // the level does with it (see LevelData.fixedTowers) and a small gold mark in top-down.
     public class Tower : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer body;
@@ -15,9 +17,10 @@ namespace TowerDefense
         [SerializeField] private Projectile projectilePrefab;
         [SerializeField] private float scanInterval = 0.1f;
         [Header("Visuals only (no effect on gameplay)")]
-        [Tooltip("Scale multiplier for a short 'kick' when the tower fires.")]
-        [SerializeField] private float fireKickScale = 1.1f;
         [SerializeField] private float fireKickDuration = 0.05f;
+        [SerializeField] private SkinnedSprite shadowSkin;
+        [Tooltip("Top-down only: the gold dot of a fixed tower.")]
+        [SerializeField] private GameObject fixedMark;
 
         private readonly List<Enemy> inRange = new List<Enemy>(); // Reused every scan: no garbage.
         private Enemy currentTarget;
@@ -31,21 +34,29 @@ namespace TowerDefense
 
         public TowerSO Data { get; private set; }
         public Vector2Int Cell { get; private set; }
+        public bool IsFixed { get; private set; }
 
         // The enemy this tower is aiming at, or null. Unity's overloaded == makes a destroyed
         // enemy compare equal to null, so a dead target is never returned.
         public Enemy CurrentTarget => currentTarget != null && !currentTarget.IsDead ? currentTarget : null;
 
-        public void Initialize(TowerSO data, Vector2Int cell, GridManager gridManager)
+        public void Initialize(TowerSO data, Vector2Int cell, GridManager gridManager, bool isFixed = false)
         {
             Data = data;
             Cell = cell;
+            IsFixed = isFixed;
             grid = gridManager != null ? gridManager : GridManager.Instance;
             if (grid != null) grid.ProjectionChanged += SnapViewToGrid;
             name = $"{data.displayName} ({cell.x},{cell.y})";
             if (body == null) body = GetComponentInChildren<SpriteRenderer>();
             if (body != null) body.color = data.color;
-            if (look != null) look.SetTint(data.color); // Top-down tint; a skinned sprite is drawn untinted.
+            if (look != null)
+            {
+                look.SetTint(data.color); // Top-down tint; a skinned sprite is drawn untinted.
+                look.SetIsometricSlot(data.bodySlot);
+            }
+            if (shadowSkin != null) shadowSkin.SetSlot(data.shadowSlot);
+            transform.localScale *= data.topDownScale; // A skinned sprite cancels this: native pixel size.
 
             // The kick scales only the body (the square in top-down; the pillar and cap in
             // isometric), never the base plate or the ground shadow.
@@ -82,6 +93,7 @@ namespace TowerDefense
         private void ApplyView()
         {
             if (look != null) look.Apply(grid);
+            if (fixedMark != null) fixedMark.SetActive(IsFixed && grid != null && grid.ProjectionType != GridProjectionType.Isometric);
             // The look may change the body's scale (native pixel size when skinned), so the kick
             // always starts from the body's current rest scale.
             kickTimeLeft = 0f;
@@ -129,10 +141,11 @@ namespace TowerDefense
             if (target == null) return;
 
             Projectile projectile = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
+            projectile.SetLook(Data);
             projectile.Initialize(target, Data.damage, Data.projectileSpeed, grid, Cell);
             fireCooldown = 1f / Data.fireRate;
 
-            KickTarget.localScale = baseScale * fireKickScale; // Visual only.
+            KickTarget.localScale = baseScale * Data.fireKickScale; // Visual only.
             kickTimeLeft = fireKickDuration;
         }
 

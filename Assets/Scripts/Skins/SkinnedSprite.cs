@@ -56,6 +56,15 @@ namespace TowerDefense
             slot = newSlot;
         }
 
+        // Shared prefabs (a projectile per tower type): tint and size of the fallback sprite,
+        // the size relative to the one it was built with.
+        public void SetFallbackLook(Color color, float scale)
+        {
+            Capture();
+            fallbackColor = color;
+            fallbackScale *= scale;
+        }
+
         // Picks the sprite for 'gridManager's current projection.
         public void Apply(GridManager gridManager)
         {

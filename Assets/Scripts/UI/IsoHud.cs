@@ -35,6 +35,9 @@ namespace TowerDefense
         [SerializeField] private TMP_Text waveText;
         [Tooltip("Small subtitle in the wave panel: the level name.")]
         [SerializeField] private TMP_Text levelText;
+        [Tooltip("The tower card: only ever the tower this level lets the player buy.")]
+        [SerializeField] private Image towerIcon;
+        [SerializeField] private TMP_Text towerPrice;
         [SerializeField] private TMP_Text targetText;
         [SerializeField] private Button previousTarget;
         [SerializeField] private Button nextTarget;
@@ -92,6 +95,12 @@ namespace TowerDefense
             RefreshResources();
             RefreshTarget(TargetingSettings.Mode);
             if (levelText != null && LevelManager.Instance != null) levelText.text = LevelManager.Instance.Current.levelName;
+            TowerSO buildTower = LevelManager.Instance != null ? LevelManager.Instance.BuildTower : null;
+            if (buildTower != null)
+            {
+                if (towerIcon != null) towerIcon.sprite = skin.Get(buildTower.bodySlot);
+                if (towerPrice != null) towerPrice.text = buildTower.cost.ToString();
+            }
         }
 
         private void RefreshResources()

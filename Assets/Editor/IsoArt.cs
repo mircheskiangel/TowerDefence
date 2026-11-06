@@ -74,6 +74,103 @@ namespace TowerDefense.EditorTools
             EliteBall("TankElite", EliteBallRadius);
             BallShadow("TankEliteShadow", EliteBallRadius);
             IconLock();
+            SiegeBody();
+            SiegeShadow();
+            SiegeProjectile();
+        }
+
+        // The Siege Cannon: a wide stone plinth with a gold plate (it marks the tower as fixed), a
+        // taller dark stone body with a dark red banner, a battlement and a large cannon. Left face
+        // lighter, right face darker, like the Basic tower. Pivot at the feet. The ground shadow is
+        // separate, so the fire kick never scales it.
+        private static void SiegeBody()
+        {
+            var c = new PixelCanvas(TileW, 80);
+            int x = 32, y = 68;
+            const int pw = 21, ph = 10, pH = 12; // Plinth half width, half depth, height.
+            const int w = 14, h = 7, H = 40;     // Body half width, half depth, height.
+            int by = y - pH;                     // The body stands on the plinth.
+
+            // Plinth: chequered stone on both faces (reaching under the top, so no gap stays open), flat top.
+            for (int face = 0; face < 2; face++)
+            {
+                bool left = face == 0;
+                float shade = left ? 1f : 0.70f;
+                for (int k = 0; k < pH + 2; k++)
+                    for (int i = 0; i < pw; i++)
+                    {
+                        int yy = (int)(y + ph * (1f - i / (float)pw)) - k;
+                        Color32 stone = ((k / 3 + i / 5) % 2 == 0) ? Rgb(150, 146, 138) : Rgb(126, 122, 116);
+                        c.Put(left ? x - i - 1 : x + i, yy, Mul(stone, shade));
+                    }
+            }
+            // With its edge pixels, so no gap stays open between the top and the two faces.
+            c.FillPolygonWithEdges(Pts(x, y, -pw, -pH, 0, ph - pH, pw, -pH, 0, -ph - pH), Rgb(170, 166, 156));
+
+            // Gold plate on the plinth's left face, near the front corner.
+            for (int dy = 0; dy < 5; dy++)
+                for (int dx = 0; dx < 9; dx++)
+                {
+                    int yy = (int)(y + ph * (1f - (10 - dx) / (float)pw)) - 3 - dy;
+                    c.Put(x - 10 + dx, yy, dy == 4 ? Rgb(255, 228, 130) : dy == 0 ? Rgb(150, 106, 24) : Rgb(224, 178, 52));
+                }
+
+            // Body: dark stone with mortar lines every 5 rows.
+            c.FillPolygon(Pts(x, by, -w, 0, 0, h, 0, h - H, -w, -H), Rgb(104, 98, 96));
+            c.FillPolygon(Pts(x, by, 0, h, w, 0, w, -H, 0, h - H), Rgb(72, 68, 68));
+            for (int k = 4; k < H; k += 5)
+                for (int i = 0; i < w; i++)
+                {
+                    int yy = (int)(by + h * (1f - i / (float)w)) - k;
+                    c.Put(x - i - 1, yy, Rgb(84, 78, 78));
+                    c.Put(x + i, yy, Rgb(56, 52, 54));
+                }
+
+            // Dark red banner on the left face, with a gold hem.
+            for (int dy = 0; dy < 20; dy++)
+                for (int dx = 0; dx < 7; dx++)
+                {
+                    int yy = (int)(by + h * (1f - (w - 4 - dx) / (float)w)) - 12 - dy;
+                    c.Put(x - w + 4 + dx, yy, dy < 2 ? Rgb(214, 168, 48) : Rgb(112, 18, 28));
+                }
+
+            // Battlement top and its inner floor.
+            c.FillPolygon(Pts(x, by, -w, -H, 0, h - H, w, -H, 0, -h - H), Rgb(150, 146, 138));
+            c.FillPolygon(Pts(x, by, -w + 4, -H, 0, h - H - 2, w - 4, -H, 0, -h - H + 2), Rgb(70, 64, 62));
+
+            // Merlons on the 4 corners: back first, then the cannon, then left, right and front.
+            Merlon(c, x - 2, by - h - H + 1);
+            int cy = by - H + 1;
+            c.FillPolygon(Pts(x, cy, -5, 0, 5, 0, 5, -6, -5, -6), Rgb(58, 58, 66));
+            for (int i = 0; i < 16; i++)
+                for (int j = 0; j < 5; j++)
+                {
+                    bool muzzle = i >= 13;
+                    c.Put(x - 1 + i, cy - 8 - i / 2 + j - (muzzle ? 1 : 0), j == 0 ? Rgb(92, 92, 102) : j < 4 ? Rgb(44, 44, 50) : Rgb(30, 30, 34));
+                    if (muzzle) c.Put(x - 1 + i, cy - 8 - i / 2 + j, Rgb(30, 30, 34));
+                }
+            Merlon(c, x - w + 1, by - H);
+            Merlon(c, x + w - 5, by - H);
+            Merlon(c, x - 2, by + h - H - 1);
+            SaveSprite(c, "SiegeBody", PivotAt(c, x, y));
+        }
+
+        // Larger and darker than the Basic tower's shadow, because the tower is taller and wider.
+        private static void SiegeShadow()
+        {
+            var c = new PixelCanvas(68, 26);
+            c.Shadow(34, 13, 29, 11, 0.36f);
+            c.Shadow(34, 13, 26, 9, 0.42f);
+            SaveSprite(c, "SiegeShadow", PivotAt(c, 31, 10));
+        }
+
+        // A heavy iron ball with a dull red glow, larger and darker than the Basic tower's shot.
+        private static void SiegeProjectile()
+        {
+            var c = new PixelCanvas(22, 22);
+            c.FillEllipse(11, 11, 10, 10, Rgb(170, 60, 20), 0.3f);
+            c.Sphere(11, 11, 6, new[] { Rgb(18, 16, 20), Rgb(34, 30, 34), Rgb(52, 46, 50), Rgb(92, 80, 78) }, Rgb(10, 8, 10));
+            SaveSprite(c, "SiegeProjectile", new Vector2(0.5f, 0.5f));
         }
 
         public const int WallVariants = 3;

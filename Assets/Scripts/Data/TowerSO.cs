@@ -17,5 +17,21 @@ namespace TowerDefense
         [Tooltip("Projectile speed in cells per second.")]
         [Min(0.5f)] public float projectileSpeed = 8f;
         public Color color = Color.white;
+        [Tooltip("Can the player buy this type? A level's allowedTowers can only offer buildable types.")]
+        public bool playerBuildable = true;
+
+        [Header("Visual only")]
+        public SkinSlot bodySlot = SkinSlot.TowerBody;
+        public SkinSlot shadowSlot = SkinSlot.TowerShadow;
+        public SkinSlot projectileSlot = SkinSlot.Projectile;
+        [Tooltip("Top-down: the projectile's tint.")]
+        public Color projectileColor = new Color(1.00f, 0.92f, 0.25f);
+        [Tooltip("Top-down: the projectile's size relative to the normal one.")]
+        [Min(0.1f)] public float projectileScale = 1f;
+        public bool projectileTrail;
+        [Tooltip("Scale multiplier of the body for a short 'kick' when the tower fires.")]
+        [Min(1f)] public float fireKickScale = 1.1f;
+        [Tooltip("Top-down: size of the square relative to the normal tower.")]
+        [Min(0.1f)] public float topDownScale = 1f;
     }
 }

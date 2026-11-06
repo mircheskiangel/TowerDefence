@@ -25,6 +25,7 @@ namespace TowerDefense.EditorTools
         private static float speed = 4f;
         private static GridProjectionType? projectionOverride;
         private static int levelIndex;
+        private static readonly Dictionary<int, int> killsByWave = new Dictionary<int, int>();
         private static bool previousRunInBackground;
 
         // Current run
@@ -143,15 +144,35 @@ namespace TowerDefense.EditorTools
                 GridManager grid = Object.FindAnyObjectByType<GridManager>();
                 if (grid != null) grid.SetProjection(projectionOverride.Value);
             }
-            plan = levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers) : BuildPlan(strategy, out maxTowers);
+            plan = levelIndex == 2 ? BuildFortressPlan(strategy, out maxTowers)
+                 : levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers)
+                 : BuildPlan(strategy, out maxTowers);
             planIndex = 0;
             towersPlaced = goldSpent = kills = 0;
+            killsByWave.Clear();
             Enemy.OnDied += CountKill; // GameManager cleared old subscribers when this level started.
             realStart = Time.realtimeSinceStartup;
             phase = Phase.Running;
         }
 
-        private static void CountKill(Enemy enemy) => kills++;
+        private static void CountKill(Enemy enemy)
+        {
+            kills++;
+            int wave = waves.CurrentWaveNumber;
+            killsByWave.TryGetValue(wave, out int n);
+            killsByWave[wave] = n + 1;
+        }
+
+        private static string KillsByWave()
+        {
+            var parts = new List<string>();
+            for (int wave = 1; wave <= waves.TotalWaves; wave++)
+            {
+                killsByWave.TryGetValue(wave, out int n);
+                parts.Add(n.ToString());
+            }
+            return string.Join("/", parts);
+        }
 
         private static void EndRun()
         {
@@ -163,7 +184,7 @@ namespace TowerDefense.EditorTools
                 towersPlaced, goldSpent, resources.Gold, kills, Time.timeSinceLevelLoad, Time.realtimeSinceStartup - realStart);
             GridManager endGrid = Object.FindAnyObjectByType<GridManager>();
             List<Vector2Int> endPath = endGrid != null ? new AStarPathfinder(endGrid).FindPath(endGrid.SpawnCell, endGrid.GoalCell) : null;
-            line += $"  path {(endPath != null ? endPath.Count : 0)}";
+            line += $"  path {(endPath != null ? endPath.Count : 0)}  killsByWave {KillsByWave()}";
             Results.Add(line);
             File.AppendAllText(ResultsPath, line + "\n");
             Debug.Log("[BalanceBot] " + line);
@@ -255,6 +276,50 @@ namespace TowerDefense.EditorTools
                     List<Vector2Int> beside = CellsBesidePath();
                     List<Vector2Int> cells = beside.GetRange(0, Mathf.Min(12, beside.Count));
                     cells.AddRange(Cells((8, 8), (8, 9), (4, 2), (4, 1), (4, 0), (5, 6), (6, 6)));
+                    cells.AddRange(beside);
+                    return cells;
+                }
+            }
+            Debug.LogError("[BalanceBot] Unknown strategy: " + name);
+            towerLimit = 0;
+            return new List<Vector2Int>();
+        }
+
+        // Level 3 "The Fortress": walls at x=3 and x=11 with gates at y=0, 4, 5, 9, x=7 with y=3..6 closed;
+        // Siege Cannons at (4,7) and (12,7). The bots build only what the level offers: Basic towers.
+        private static List<Vector2Int> BuildFortressPlan(string name, out int towerLimit)
+        {
+            towerLimit = int.MaxValue;
+            switch (name)
+            {
+                case "none":
+                    towerLimit = 0;
+                    return new List<Vector2Int>();
+
+                case "weak": // 4 towers in one clump next to the middle of the path.
+                {
+                    towerLimit = 4;
+                    GridManager grid = Object.FindAnyObjectByType<GridManager>();
+                    List<Vector2Int> path = new AStarPathfinder(grid).FindPath(grid.SpawnCell, grid.GoalCell);
+                    Vector2Int middle = path[path.Count / 2];
+                    List<Vector2Int> cells = CellsBesidePath();
+                    cells.Sort((a, b) => (a - middle).sqrMagnitude.CompareTo((b - middle).sqrMagnitude));
+                    return cells;
+                }
+
+                case "reasonable": // Towers beside the current path, spread from the spawn side outwards.
+                    return CellsBesidePath();
+
+                case "maze": // Stands beside the path like "reasonable", which holds the first waves. Then two
+                             // towers on the path in the gap under the middle wall push the route down to its
+                             // edge and back up: 4 cells longer against the slow elite Tanks, and these towers
+                             // keep shooting along it.
+                {
+                    var beside = new List<Vector2Int>();
+                    foreach (Vector2Int cell in CellsBesidePath())
+                        if (cell.x < 6 || cell.x > 8 || cell.y > 1) beside.Add(cell);
+                    List<Vector2Int> cells = beside.GetRange(0, Mathf.Min(13, beside.Count));
+                    cells.AddRange(Cells((7, 2), (7, 1)));
                     cells.AddRange(beside);
                     return cells;
                 }
