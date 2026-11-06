@@ -42,6 +42,16 @@ namespace TowerDefense
         public Sprite gruntCharacterShadow;
         public Sprite tankCharacterShadow;
 
+        [Header("Elite Tank (walk frames facing right, ball, shadows)")]
+        public Sprite[] tankEliteWalk = new Sprite[0];
+        public Sprite tankEliteCharacterShadow;
+        public Sprite tankElite;
+        public Sprite tankEliteShadow;
+
+        [Header("Permanent walls")]
+        public Sprite[] walls = new Sprite[0];
+        public Sprite wallShadow;
+
         [Header("Decoration")]
         public Sprite[] trees = new Sprite[0];
         public Sprite[] rocks = new Sprite[0];
@@ -53,6 +63,7 @@ namespace TowerDefense
         public Sprite iconCoin;
         public Sprite iconHeart;
         public Sprite iconArrow;
+        public Sprite iconLock;
 
         [Header("Effects")]
         public Sprite healthBarFrame;
@@ -92,6 +103,13 @@ namespace TowerDefense
                 case SkinSlot.TankWalk: return Pick(tankWalk, variant);
                 case SkinSlot.GruntCharacterShadow: return gruntCharacterShadow;
                 case SkinSlot.TankCharacterShadow: return tankCharacterShadow;
+                case SkinSlot.Wall: return Pick(walls, variant);
+                case SkinSlot.WallShadow: return wallShadow;
+                case SkinSlot.TankEliteWalk: return Pick(tankEliteWalk, variant);
+                case SkinSlot.TankEliteCharacterShadow: return tankEliteCharacterShadow;
+                case SkinSlot.TankElite: return tankElite;
+                case SkinSlot.TankEliteShadow: return tankEliteShadow;
+                case SkinSlot.IconLock: return iconLock;
                 case SkinSlot.HealthBarFrame: return healthBarFrame;
                 case SkinSlot.PortalGlow: return portalGlow;
                 case SkinSlot.Puff: return puff;
@@ -112,6 +130,8 @@ namespace TowerDefense
                 case SkinSlot.GrassDetail: return Count(grassDetails);
                 case SkinSlot.GruntWalk: return Count(gruntWalk);
                 case SkinSlot.TankWalk: return Count(tankWalk);
+                case SkinSlot.TankEliteWalk: return Count(tankEliteWalk);
+                case SkinSlot.Wall: return Count(walls);
                 case SkinSlot.Tree: return Count(trees);
                 case SkinSlot.Rock: return Count(rocks);
                 case SkinSlot.Bush: return Count(bushes);
@@ -139,6 +159,10 @@ namespace TowerDefense
             gruntWalk = new Sprite[0];
             tankWalk = new Sprite[0];
             gruntCharacterShadow = tankCharacterShadow = null;
+            tankEliteWalk = new Sprite[0];
+            tankEliteCharacterShadow = tankElite = tankEliteShadow = null;
+            walls = new Sprite[0];
+            wallShadow = iconLock = null;
             trees = new Sprite[0];
             rocks = new Sprite[0];
             bushes = new Sprite[0];

@@ -40,6 +40,10 @@ namespace TowerDefense
         // How many cells the last search expanded (useful to show in a presentation).
         public int LastExpandedCount { get; private set; }
 
+        // The cells the last search expanded (its closed set), or null if it never started.
+        // Only a reference to the array the search allocates anyway, so reading it costs nothing.
+        public bool[,] LastClosed { get; private set; }
+
         public AStarPathfinder(GridManager grid)
         {
             this.grid = grid;
@@ -58,12 +62,14 @@ namespace TowerDefense
         public List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
         {
             LastExpandedCount = 0;
+            LastClosed = null;
             if (grid == null || !grid.IsInBounds(start) || !grid.IsWalkable(goal)) return null;
 
             int w = grid.Width;
             int h = grid.Height;
             int[,] gCost = new int[w, h];
             bool[,] closed = new bool[w, h];
+            LastClosed = closed;
             Vector2Int[,] cameFrom = new Vector2Int[w, h];
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)

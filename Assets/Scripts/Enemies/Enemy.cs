@@ -37,6 +37,8 @@ namespace TowerDefense
         public event Action<float, float> HealthChanged;
 
         private EnemySO data;
+        private float maxHealth;
+        private bool elite;
         private GridManager grid;
         private AStarPathfinder pathfinder;
 
@@ -48,7 +50,10 @@ namespace TowerDefense
 
         public EnemySO Data => data;
         public float CurrentHealth { get; private set; }
-        public float MaxHealth => data != null ? data.maxHealth : 0f;
+        public float MaxHealth => maxHealth;
+        public bool IsElite => elite;
+        // Visual only: the walk frames this enemy is drawn with (Characters style).
+        public SkinSlot WalkSlot => EliteOr(data.eliteWalkSlot, data.walkSlot);
         public bool IsDead { get; private set; }
         public bool IsWaiting => !hasRoute;
 
@@ -75,25 +80,36 @@ namespace TowerDefense
             }
         }
 
-        public void Initialize(EnemySO enemyData, GridManager gridManager, AStarPathfinder sharedPathfinder)
+        // healthMultiplier and isElite come from the wave group: the base stats in EnemySO stay the
+        // same for everyone. Elite is the look only; its strength is the health multiplier.
+        public void Initialize(EnemySO enemyData, GridManager gridManager, AStarPathfinder sharedPathfinder,
+            float healthMultiplier = 1f, bool isElite = false)
         {
             data = enemyData;
+            elite = isElite;
+            maxHealth = data.maxHealth * healthMultiplier;
             grid = gridManager;
             pathfinder = sharedPathfinder;
 
-            CurrentHealth = data.maxHealth;
+            CurrentHealth = maxHealth;
             name = data.displayName;
             // Start where we were spawned, converted once into grid coordinates.
             gridPosition = grid.WorldToGrid(transform.position);
             transform.position = grid.GridToWorld(gridPosition);
-            transform.localScale = Vector3.one * data.scale * grid.CellSize;
+            transform.localScale = Vector3.one * data.scale * (elite ? data.eliteScale : 1f) * grid.CellSize;
+            Color tint = elite ? data.eliteColor : data.color;
             if (body == null) body = GetComponentInChildren<SpriteRenderer>();
-            if (body != null) body.color = data.color;
-            if (look != null) look.SetTint(data.color);
+            if (body != null) body.color = tint;
+            if (look != null) look.SetTint(tint);
             ApplySkinSlots();
-            if (healthBar != null) healthBar.SetSkinnedWidth(data.healthBarPixels);
+            if (healthBar != null)
+            {
+                int barPixels = elite && data.eliteHealthBarPixels > 0 ? data.eliteHealthBarPixels : data.healthBarPixels;
+                healthBar.SetSkinnedWidth(barPixels);
+                healthBar.SetPlainWidthScale((float)barPixels / data.healthBarPixels);
+            }
             if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
-            if (hitFlash != null) hitFlash.SetBaseColor(body != null ? body.color : data.color); // Tint or untinted skin.
+            if (hitFlash != null) hitFlash.SetBaseColor(body != null ? body.color : tint); // Tint or untinted skin.
             if (healthBar != null) healthBar.ResetBar(); // After the scale is set (keeps a fixed bar size).
             if (depth != null) depth.Initialize(grid, gridPosition);
 
@@ -161,8 +177,15 @@ namespace TowerDefense
         private void ApplySkinSlots()
         {
             bool characters = EnemySkinSettings.Style == EnemySkinStyle.Characters;
-            if (look != null) look.SetIsometricSlot(characters ? data.walkSlot : data.skinSlot);
-            if (shadowSkin != null) shadowSkin.SetSlot(characters ? data.characterShadowSlot : data.skinShadowSlot);
+            if (look != null) look.SetIsometricSlot(characters ? WalkSlot : EliteOr(data.eliteSkinSlot, data.skinSlot));
+            if (shadowSkin != null)
+                shadowSkin.SetSlot(characters ? EliteOr(data.eliteCharacterShadowSlot, data.characterShadowSlot)
+                                              : EliteOr(data.eliteSkinShadowSlot, data.skinShadowSlot));
+        }
+
+        private SkinSlot EliteOr(SkinSlot eliteSlot, SkinSlot normalSlot)
+        {
+            return elite && eliteSlot != SkinSlot.None ? eliteSlot : normalSlot;
         }
 
         // Visual only: the K key switched the skin style.

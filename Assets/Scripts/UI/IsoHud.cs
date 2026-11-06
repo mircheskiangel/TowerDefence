@@ -33,6 +33,8 @@ namespace TowerDefense
         [SerializeField] private TMP_Text goldText;
         [SerializeField] private TMP_Text livesText;
         [SerializeField] private TMP_Text waveText;
+        [Tooltip("Small subtitle in the wave panel: the level name.")]
+        [SerializeField] private TMP_Text levelText;
         [SerializeField] private TMP_Text targetText;
         [SerializeField] private Button previousTarget;
         [SerializeField] private Button nextTarget;
@@ -76,10 +78,12 @@ namespace TowerDefense
         // Shows the isometric HUD or the original labels for the current projection.
         public void Apply()
         {
-            active = grid != null && grid.ProjectionType == GridProjectionType.Isometric
+            // The level select screen shows no game HUD at all.
+            bool menu = LevelManager.Instance != null && LevelManager.Instance.InMenu;
+            active = !menu && grid != null && grid.ProjectionType == GridProjectionType.Isometric
                      && skin != null && skin.Has(SkinSlot.HudPanel);
             if (isoRoot != null) isoRoot.SetActive(active);
-            foreach (GameObject go in topDownOnly) if (go != null) go.SetActive(!active);
+            foreach (GameObject go in topDownOnly) if (go != null) go.SetActive(!active && !menu);
             foreach (GameObject go in isoOnly) if (go != null) go.SetActive(active);
             if (!active) return;
             shownGold = shownLives = int.MinValue;
@@ -87,6 +91,7 @@ namespace TowerDefense
             shownWave = shownSeconds = -1;
             RefreshResources();
             RefreshTarget(TargetingSettings.Mode);
+            if (levelText != null && LevelManager.Instance != null) levelText.text = LevelManager.Instance.Current.levelName;
         }
 
         private void RefreshResources()

@@ -61,6 +61,85 @@ namespace TowerDefense.EditorTools
             IconCoin();
             IconHeart();
             IconArrow();
+            GenerateLevelArt();
+        }
+
+        // Permanent walls, the elite Tank and the lock of the level select screen.
+        public static void GenerateLevelArt()
+        {
+            for (int k = 0; k < WallVariants; k++) Wall(k);
+            EllipseShadow("WallShadow", 22, 9);
+            SaveWalkFrames("OgreEliteWalk", Ogre(0, true), Ogre(1, true), Mathf.RoundToInt(OgrePivotX * EliteScale));
+            EllipseShadow("OgreEliteShadow", 18, 6);
+            EliteBall("TankElite", EliteBallRadius);
+            BallShadow("TankEliteShadow", EliteBallRadius);
+            IconLock();
+        }
+
+        public const int WallVariants = 3;
+        public const float EliteScale = 1.2f;
+        public const int EliteBallRadius = 18; // Tank ball radius 15 x 1.2.
+        public static int TankEliteBarPixels => Mathf.RoundToInt(TankBarPixels * 1.25f);
+
+        // Low boulder on a permanent wall cell: a small cluster of 2-3 stones, about 70% of the tile
+        // wide (45 px) and at most 18 px high, so it stays clearly lower than a Grunt. Same style as
+        // the decorative rocks, but darker and with a lighter top edge per stone, so it reads as
+        // "not buildable". Pivot: the center of the cell on the ground.
+        private static void Wall(int variant)
+        {
+            Color32[] ramp = { Rgb(52, 50, 56), Rgb(78, 76, 80), Rgb(104, 102, 104), Rgb(132, 130, 128) };
+            Color32 topEdge = Rgb(178, 174, 162);
+            float[][] stones = variant == 0
+                ? new[] { new[] { 24f, 11f, 11f, 6f }, new[] { 12f, 15f, 9f, 5f }, new[] { 35f, 15f, 10f, 5f } }
+                : variant == 1
+                    ? new[] { new[] { 29f, 11f, 15f, 6f }, new[] { 14f, 15f, 11f, 5f } }
+                    : new[] { new[] { 15f, 12f, 11f, 5.5f }, new[] { 33f, 12f, 11f, 5.5f }, new[] { 24f, 16f, 8f, 4.5f } };
+            var c = new PixelCanvas(48, 24);
+            foreach (float[] s in stones)
+            {
+                c.ShadedEllipse(s[0], s[1], s[2], s[3], ramp);
+                // Lighter top edge: the first pixel of this stone in every column (not its end columns).
+                for (int x = Mathf.CeilToInt(s[0] - s[2]) + 1; x < Mathf.FloorToInt(s[0] + s[2]) - 1; x++)
+                {
+                    for (int y = Mathf.FloorToInt(s[1] - s[3]); y <= s[1]; y++)
+                    {
+                        float nx = (x + 0.5f - s[0]) / s[2], ny = (y + 0.5f - s[1]) / s[3];
+                        if (nx * nx + ny * ny > 1f) continue;
+                        c.Put(x, y, topEdge);
+                        break;
+                    }
+                }
+            }
+            c.Outline(Rgb(30, 28, 32));
+            SaveSprite(c, $"Wall_{variant}", PivotAt(c, 24f, 15f));
+        }
+
+        // Closed padlock: steel shackle, gold body with a keyhole.
+        private static void IconLock()
+        {
+            Color32 steel = Rgb(176, 180, 190), gold = Rgb(224, 178, 52), goldLight = Rgb(255, 224, 120), goldDark = Rgb(150, 106, 24);
+            var c = new PixelCanvas(16, 20);
+            c.FillRect(4, 1, 11, 2, steel);
+            c.FillRect(3, 2, 4, 9, steel);
+            c.FillRect(11, 2, 12, 9, steel);
+            c.FillRect(1, 9, 14, 18, gold);
+            c.FillRect(1, 9, 14, 10, goldLight);
+            c.FillRect(1, 17, 14, 18, goldDark);
+            c.FillRect(7, 12, 8, 15, Rgb(30, 18, 10));
+            c.Outline(Rgb(20, 14, 14));
+            SaveSprite(c, "IconLock", new Vector2(0.5f, 0.5f));
+        }
+
+        // The Tank's ball for the elite (Balls style): larger, darker, with a golden rim.
+        private static void EliteBall(string name, int r)
+        {
+            Color32[] ramp = { Rgb(38, 16, 66), Rgb(70, 34, 110), Rgb(102, 56, 148), Rgb(146, 104, 196) };
+            int size = 2 * r + 8;
+            var c = new PixelCanvas(size, size);
+            int feetX = r + 4, feetY = size - 2, centerY = feetY - r - 1;
+            c.FillEllipse(feetX, centerY, r + 2, r + 2, Rgb(232, 186, 60));
+            c.Sphere(feetX, centerY, r, ramp, Rgb(96, 64, 12));
+            SaveSprite(c, name, PivotAt(c, feetX + 0.5f, feetY + 0.5f));
         }
 
         // Goblin (Grunt) and ogre (Tank): 2 walk frames each, facing right, and a ground shadow
@@ -527,47 +606,60 @@ namespace TowerDefense.EditorTools
             return c;
         }
 
-        private static PixelCanvas Ogre(int frame)
+        // elite: the palette-swapped elite Tank, drawn 1.2x larger: darker purple, dark plates with a
+        // gold trim. Geometry is scaled on the pixel grid, so the outline stays 1 px.
+        private static PixelCanvas Ogre(int frame, bool elite = false)
         {
-            Color32[] skin = { Rgb(64, 32, 104), Rgb(106, 60, 152), Rgb(146, 92, 198), Rgb(190, 146, 238) };
-            Color32[] steel = { Rgb(60, 62, 72), Rgb(98, 102, 114), Rgb(140, 146, 158), Rgb(190, 196, 208) };
+            float k = elite ? EliteScale : 1f;
+            float S(float v) => v * k;
+            int I(float v) => Mathf.RoundToInt(v * k);
+            Color32[] skin = elite
+                ? new[] { Rgb(40, 18, 70), Rgb(72, 36, 112), Rgb(104, 58, 150), Rgb(140, 96, 188) }
+                : new[] { Rgb(64, 32, 104), Rgb(106, 60, 152), Rgb(146, 92, 198), Rgb(190, 146, 238) };
+            Color32[] steel = elite
+                ? new[] { Rgb(38, 38, 48), Rgb(62, 64, 76), Rgb(88, 92, 106), Rgb(120, 124, 138) }
+                : new[] { Rgb(60, 62, 72), Rgb(98, 102, 114), Rgb(140, 146, 158), Rgb(190, 196, 208) };
+            Color32[] gold = { Rgb(120, 84, 16), Rgb(176, 128, 30), Rgb(224, 178, 52), Rgb(255, 224, 120) };
             Color32[] wood = { Rgb(70, 44, 26), Rgb(104, 70, 42), Rgb(134, 94, 58), Rgb(160, 118, 78) };
             Color32 boot = Rgb(48, 40, 36), tusk = Rgb(250, 248, 236);
-            var c = new PixelCanvas(40, 44);
+            var c = new PixelCanvas(I(40), I(44));
             int bob = frame == 1 ? 1 : 0, liftLeft = frame == 0 ? 1 : 0, liftRight = frame == 1 ? 1 : 0;
             // Legs with boots: the lifted one is a pixel shorter.
-            c.FillRect(11, 32, 16, 38 - liftLeft, skin[0]);
-            c.FillRect(10, 38 - liftLeft, 17, 40 - liftLeft, boot);
-            c.FillRect(23, 32, 28, 38 - liftRight, skin[1]);
-            c.FillRect(22, 38 - liftRight, 29, 40 - liftRight, boot);
+            c.FillRect(I(11), I(32), I(16), I(38) - liftLeft, skin[0]);
+            c.FillRect(I(10), I(38) - liftLeft, I(17), I(40) - liftLeft, boot);
+            c.FillRect(I(23), I(32), I(28), I(38) - liftRight, skin[1]);
+            c.FillRect(I(22), I(38) - liftRight, I(29), I(40) - liftRight, boot);
             // Back arm fist, body, belt with buckle.
-            c.ShadedEllipse(7, 29 - bob, 3.6f, 5f, skin);
-            c.ShadedEllipse(20, 27 - bob, 11f, 9f, skin);
-            c.FillRect(11, 30 - bob, 29, 32 - bob, Rgb(70, 66, 62));
-            c.FillRect(18, 30 - bob, 22, 32 - bob, Rgb(210, 170, 60));
+            c.ShadedEllipse(S(7), S(29) - bob, S(3.6f), S(5f), skin);
+            c.ShadedEllipse(S(20), S(27) - bob, S(11f), S(9f), skin);
+            c.FillRect(I(11), I(30) - bob, I(29), I(32) - bob, Rgb(70, 66, 62));
+            c.FillRect(I(18), I(30) - bob, I(22), I(32) - bob, Rgb(210, 170, 60));
             // Round shield on the front arm.
-            c.ShadedEllipse(32, 29 - bob, 6f, 6.4f, wood);
-            c.ShadedEllipse(32, 29 - bob, 2.2f, 2.4f, steel);
-            c.ShadedEllipse(33, 27 - bob, 3f, 3f, skin);
-            // Steel shoulder plates with rivets.
-            c.ShadedEllipse(10, 20 - bob, 5f, 3.6f, steel);
-            c.ShadedEllipse(30, 20 - bob, 5f, 3.6f, steel);
+            c.ShadedEllipse(S(32), S(29) - bob, S(6f), S(6.4f), wood);
+            c.ShadedEllipse(S(32), S(29) - bob, S(2.2f), S(2.4f), elite ? gold : steel);
+            c.ShadedEllipse(S(33), S(27) - bob, S(3f), S(3f), skin);
+            // Steel shoulder plates with rivets; the elite's are dark with a gold trim.
+            foreach (float plateX in new[] { 10f, 30f })
+            {
+                if (elite) c.ShadedEllipse(S(plateX), S(20) - bob, S(5f) + 1f, S(3.6f) + 1f, gold);
+                c.ShadedEllipse(S(plateX), S(20) - bob, S(5f), S(3.6f), steel);
+            }
             foreach (int px in new[] { 8, 12, 28, 32 })
             {
-                c.Put(px, 16 - bob, steel[3]);
-                c.Put(px, 17 - bob, steel[2]);
+                c.Put(I(px), I(16) - bob, elite ? gold[3] : steel[3]);
+                c.Put(I(px), I(17) - bob, elite ? gold[2] : steel[2]);
             }
             // Head: yellow eyes looking right, brows, mouth and two tusks.
-            c.ShadedEllipse(20, 14 - bob, 6.8f, 6f, skin);
-            c.FillRect(16, 12 - bob, 18, 13 - bob, Rgb(255, 230, 120));
-            c.FillRect(22, 12 - bob, 24, 13 - bob, Rgb(255, 230, 120));
-            c.Put(17, 13 - bob, Rgb(120, 10, 10));
-            c.Put(23, 13 - bob, Rgb(120, 10, 10));
-            c.Line(15, 10 - bob, 19, 12 - bob, Rgb(30, 10, 40));
-            c.Line(25, 10 - bob, 21, 12 - bob, Rgb(30, 10, 40));
-            c.FillRect(17, 18 - bob, 23, 18 - bob, Rgb(50, 20, 60));
-            c.FillPolygonWithEdges(new[] { new Vector2(17, 18 - bob), new Vector2(16, 15 - bob), new Vector2(18, 18 - bob) }, tusk);
-            c.FillPolygonWithEdges(new[] { new Vector2(23, 18 - bob), new Vector2(24, 15 - bob), new Vector2(22, 18 - bob) }, tusk);
+            c.ShadedEllipse(S(20), S(14) - bob, S(6.8f), S(6f), skin);
+            c.FillRect(I(16), I(12) - bob, I(18), I(13) - bob, Rgb(255, 230, 120));
+            c.FillRect(I(22), I(12) - bob, I(24), I(13) - bob, Rgb(255, 230, 120));
+            c.Put(I(17), I(13) - bob, Rgb(120, 10, 10));
+            c.Put(I(23), I(13) - bob, Rgb(120, 10, 10));
+            c.Line(S(15), S(10) - bob, S(19), S(12) - bob, Rgb(30, 10, 40));
+            c.Line(S(25), S(10) - bob, S(21), S(12) - bob, Rgb(30, 10, 40));
+            c.FillRect(I(17), I(18) - bob, I(23), I(18) - bob, Rgb(50, 20, 60));
+            c.FillPolygonWithEdges(new[] { new Vector2(I(17), I(18) - bob), new Vector2(I(16), I(15) - bob), new Vector2(I(18), I(18) - bob) }, tusk);
+            c.FillPolygonWithEdges(new[] { new Vector2(I(23), I(18) - bob), new Vector2(I(24), I(15) - bob), new Vector2(I(22), I(18) - bob) }, tusk);
             c.Outline(Rgb(26, 12, 40));
             return c;
         }

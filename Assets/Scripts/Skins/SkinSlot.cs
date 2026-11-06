@@ -36,5 +36,12 @@ namespace TowerDefense
         TankWalk,       // variants = walk frames of the ogre (pivot: feet, facing right)
         GruntCharacterShadow, // ground shadow under the goblin
         TankCharacterShadow,  // ground shadow under the ogre
+        Wall,           // variants, low boulder on a permanent wall cell (pivot: feet)
+        WallShadow,     // soft ground shadow under a boulder (pivot: center = feet)
+        TankEliteWalk,  // variants = walk frames of the elite ogre (pivot: feet, facing right)
+        TankEliteCharacterShadow, // ground shadow under the elite ogre
+        TankElite,      // elite Tank ball with a golden rim (Balls style)
+        TankEliteShadow,// contact shadow under the elite ball
+        IconLock,       // lock of a locked level on the level select screen
     }
 }

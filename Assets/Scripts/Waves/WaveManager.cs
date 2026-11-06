@@ -37,6 +37,12 @@ namespace TowerDefense
         public event Action<int> WaveCleared;
         public event Action AllWavesCleared;
 
+        // The waves of the level. Called by LevelManager before this object's Start.
+        public void SetWaves(List<WaveSO> levelWaves)
+        {
+            waves = levelWaves;
+        }
+
         private void OnEnable()
         {
             if (resources == null) resources = PlayerResources.Instance;
@@ -126,17 +132,17 @@ namespace TowerDefense
 
                 for (int n = 0; n < group.count; n++)
                 {
-                    SpawnEnemy(group.enemy);
+                    SpawnEnemy(group);
                     if (n < group.count - 1) yield return new WaitForSeconds(group.spawnInterval);
                 }
             }
             IsSpawning = false;
         }
 
-        private void SpawnEnemy(EnemySO data)
+        private void SpawnEnemy(WaveSO.SpawnGroup group)
         {
             Enemy enemy = Instantiate(enemyPrefab, grid.CellToWorld(grid.SpawnCell), Quaternion.identity, container);
-            enemy.Initialize(data, grid, pathfinder);
+            enemy.Initialize(group.enemy, grid, pathfinder, group.healthMultiplier, group.elite);
         }
 
         // Safety stop: without it the coroutine would keep spawning (and the "wave cleared"

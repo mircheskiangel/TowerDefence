@@ -17,6 +17,9 @@ namespace TowerDefense
     // - a standing spawn portal and goal gate on the ring cells beside spawn and goal, depth
     //   sorted like units (they replace the flat markers).
     // Every slot is optional; an empty slot falls back to the M7 look for that part.
+    //
+    // Permanent walls are drawn in both views: boulders (Wall slot, with a shadow) depth sorted
+    // like towers in isometric, small stone-coloured rounded squares in top-down.
     public class BoardView : MonoBehaviour
     {
         private const string TilesName = "Tiles";
@@ -26,6 +29,7 @@ namespace TowerDefense
         private const string DecorName = "Decor";
         private const string BackgroundName = "Background";
         private const string DetailsName = "GrassDetails";
+        private const string WallsName = "Walls";
 
         [System.Serializable]
         public struct Decoration
@@ -48,6 +52,15 @@ namespace TowerDefense
         [SerializeField] private int markerSortingOrder = 1;
         [SerializeField] private float markerScale = 0.9f;
 
+        [Header("Walls")]
+        [SerializeField] private Sprite wallSquareSprite;
+        [SerializeField] private Color wallSquareColor = new Color(0.62f, 0.62f, 0.66f);
+        [Tooltip("Size of the top-down wall square relative to one cell.")]
+        [SerializeField] private float wallSquareScale = 0.7f;
+        [SerializeField] private int wallSquareOrder = 5;
+        [Tooltip("The level this scene was built with: applying it again needs no rebuild.")]
+        [SerializeField] private LevelData bakedLevel;
+
         [Header("Isometric island (skin only)")]
         [Tooltip("Cells of decorative terrain around the board (scenery, not part of the grid).")]
         [SerializeField] private int ringWidth = 1;
@@ -68,6 +81,18 @@ namespace TowerDefense
             if (grid != null) grid.ProjectionChanged -= Rebuild;
         }
 
+        // Draws the board for 'level' (the grid has it already). The scene is built with the first
+        // level, so that one is used as it is.
+        public void ApplyLevel(LevelData level)
+        {
+            if (level == bakedLevel) return;
+            bakedLevel = level;
+            if (skin != null)
+                decorations = DecorationPlacer.Place(grid, level.decorationSeed, ringWidth,
+                    skin.VariantCount(SkinSlot.Tree), skin.VariantCount(SkinSlot.Rock), skin.VariantCount(SkinSlot.Bush)).ToArray();
+            Rebuild();
+        }
+
         // Ring cell just outside the board next to 'cell' (spawn and goal lie on the board edge).
         public static Vector2Int OutsideNeighbour(GridManager grid, Vector2Int cell)
         {
@@ -80,7 +105,7 @@ namespace TowerDefense
         public void Rebuild()
         {
             if (grid == null) return;
-            foreach (string child in new[] { TilesName, SpawnName, GoalName, CliffsName, DecorName, BackgroundName, DetailsName })
+            foreach (string child in new[] { TilesName, SpawnName, GoalName, CliffsName, DecorName, BackgroundName, DetailsName, WallsName })
                 RemoveChild(child);
 
             bool iso = grid.ProjectionType == GridProjectionType.Isometric;
@@ -119,6 +144,8 @@ namespace TowerDefense
                 BuildBackground();
                 BuildDecor();
             }
+
+            BuildWalls(iso);
 
             Vector3 markerSize = ScaleFor(sprite, markerScale);
             CreateMarker(SpawnName, iso ? SkinSlot.SpawnPortal : SkinSlot.None, sprite, spawnColor, grid.SpawnCell, markerSize);
@@ -178,6 +205,50 @@ namespace TowerDefense
                 if (s == null) continue;
                 CreateStanding($"{d.slot}_{i}", decor, s, d.gridPosition);
             }
+        }
+
+        // A boulder with its shadow per wall cell in isometric (variant chosen from the cell's
+        // coordinates), otherwise a small rounded square. Nothing is created without walls.
+        private void BuildWalls(bool iso)
+        {
+            Transform walls = null;
+            for (int x = 0; x < grid.Width; x++)
+            {
+                for (int y = 0; y < grid.Height; y++)
+                {
+                    Vector2Int cell = new Vector2Int(x, y);
+                    if (!grid.IsPermanent(cell)) continue;
+                    if (walls == null)
+                    {
+                        walls = new GameObject(WallsName).transform;
+                        walls.SetParent(transform, false);
+                    }
+                    Sprite boulder = iso && skin != null ? skin.Get(SkinSlot.Wall, SkinSet.MixedHash(x, y)) : null;
+                    if (boulder != null) CreateBoulder(walls, cell, boulder);
+                    else
+                    {
+                        Sprite square = iso ? diamondSprite : wallSquareSprite;
+                        CreateSprite($"Wall_{x}_{y}", walls, square, wallSquareColor, wallSquareOrder,
+                            grid.CellToWorld(cell), ScaleFor(square, wallSquareScale));
+                    }
+                }
+            }
+        }
+
+        private void CreateBoulder(Transform parent, Vector2Int cell, Sprite boulder)
+        {
+            Vector3 position = grid.CellToWorld(cell);
+            SpriteRenderer body = CreateSprite($"Wall_{cell.x}_{cell.y}", parent, boulder, Color.white, wallSquareOrder,
+                position, Vector3.one * grid.CellSize);
+            Sprite shadow = skin.Get(SkinSlot.WallShadow);
+            DepthSorter depth = body.gameObject.AddComponent<DepthSorter>();
+            if (shadow != null)
+            {
+                SpriteRenderer shadowRenderer = CreateSprite("Shadow", body.transform, shadow, Color.white, wallSquareOrder - 1, position, Vector3.one);
+                depth.Configure(new Renderer[] { shadowRenderer, body }, new[] { DepthSorter.PartShadow, DepthSorter.PartBody });
+            }
+            else depth.Configure(new Renderer[] { body }, new[] { DepthSorter.PartBody });
+            depth.Initialize(grid, cell);
         }
 
         // In isometric a filled portal/gate slot is a standing object on the ring cell beside the

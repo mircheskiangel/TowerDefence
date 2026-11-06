@@ -24,6 +24,9 @@ namespace TowerDefense.EditorTools
         private const string MaterialsFolder = GeneratedFolder + "/Materials";
         private const string DataFolder = GeneratedFolder + "/Data";
         private const string WavesFolder = DataFolder + "/Waves";
+        private const string LevelsFolder = DataFolder + "/Levels";
+        private const string Level1Path = LevelsFolder + "/Level1.asset";
+        private const string Level2Path = LevelsFolder + "/Level2.asset";
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
@@ -48,6 +51,13 @@ namespace TowerDefense.EditorTools
         // --- Balance (tuned in M6 with Assets/Editor/BalanceBot.cs) ---
         private const int StartGold = 100;
         private const int StartLives = 10;
+
+        // --- Level 2 "The Snake" (tuned with BalanceBot; Level 1 and the enemy base stats stay as they are) ---
+        private const int Level2Gold = 200;
+        private const int Level2Lives = 10;
+        private const int Level2DecorSeed = 23;
+        private const float Wave2TankHealth = 1.3f;
+        private const float EliteTankHealth = 2.0f;
 
         // --- Colors ---
         private static readonly Color BackgroundColor = new Color(0.08f, 0.09f, 0.12f);
@@ -104,6 +114,7 @@ namespace TowerDefense.EditorTools
             EnsureFolder(MaterialsFolder);
             EnsureFolder(DataFolder);
             EnsureFolder(WavesFolder);
+            EnsureFolder(LevelsFolder);
             EnsureFolder(PrefabsFolder);
             EnsureFolder(ArtFolder);
 
@@ -112,6 +123,7 @@ namespace TowerDefense.EditorTools
             Sprite square = CreateSprite("Square", SpriteShape.Square);
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
             Sprite ring = CreateSprite("RangeRing", SpriteShape.Ring, RingPixels);
+            Sprite wallSquare = CreateSprite("WallSquare", SpriteShape.RoundedSquare);
             Sprite diamond = CreateDiamondSprite("Diamond", DiamondPixelsWide);
             Sprite towerIso = CreateStandingTowerSprite("TowerIso");
             Sprite towerBase = CreateTowerBaseSprite("TowerIsoBase");
@@ -125,8 +137,20 @@ namespace TowerDefense.EditorTools
             EnemySO tank = CreateEnemyData("Tank", maxHealth: 400f, moveSpeed: 1.1f, goldReward: 10,
                 new Color(0.65f, 0.35f, 0.90f), scale: 0.8f, SkinSlot.Tank, SkinSlot.TankShadow, IsoArt.TankBarPixels,
                 SkinSlot.TankWalk, SkinSlot.TankCharacterShadow, walkFrameSeconds: 0.30f);
+            // The elite look of the Tank. Visual only: its strength is the wave group's health multiplier.
+            tank.eliteSkinSlot = SkinSlot.TankElite;
+            tank.eliteSkinShadowSlot = SkinSlot.TankEliteShadow;
+            tank.eliteWalkSlot = SkinSlot.TankEliteWalk;
+            tank.eliteCharacterShadowSlot = SkinSlot.TankEliteCharacterShadow;
+            tank.eliteColor = new Color(0.40f, 0.18f, 0.62f);
+            tank.eliteScale = IsoArt.EliteScale;
+            tank.eliteHealthBarPixels = IsoArt.TankEliteBarPixels;
+            EditorUtility.SetDirty(tank);
             CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial, skin);
             List<WaveSO> waves = CreateWaves(grunt, tank);
+            CreateLevel(Level1Path, "The Meadow", new List<Vector2Int>(), StartGold, StartLives, waves, DecorSeed);
+            CreateLevel(Level2Path, "The Snake", SnakeWalls(), Level2Gold, Level2Lives, CreateLevel2Waves(grunt, tank), Level2DecorSeed);
+            AssertLevelsHavePaths();
             TowerSO basicTower = CreateTowerData("Basic Tower", cost: 25, range: 2.5f, damage: 10f, fireRate: 1.5f,
                 projectileSpeed: 8f, BasicTowerColor);
             CreateProjectilePrefab(circle, spriteMaterial, skin); // Before the tower prefab, which references it.
@@ -139,8 +163,10 @@ namespace TowerDefense.EditorTools
             // 3. Grid
             GameObject gridGo = new GameObject("Grid");
             GridManager grid = gridGo.AddComponent<GridManager>();
-            grid.Configure(GridWidth, GridHeight, CellSize, Vector2.zero, SpawnCell, GoalCell, startProjection);
-            BuildBoard(grid, square, diamond, spriteMaterial, skin);
+            LevelData level1 = AssetDatabase.LoadAssetAtPath<LevelData>(Level1Path);
+            LevelData level2 = AssetDatabase.LoadAssetAtPath<LevelData>(Level2Path);
+            grid.Configure(level1.width, level1.height, CellSize, Vector2.zero, level1.spawnCell, level1.goalCell, startProjection);
+            BoardView board = BuildBoard(grid, square, diamond, wallSquare, spriteMaterial, skin, level1);
 
             // 4. Camera
             BuildCamera(grid);
@@ -160,7 +186,9 @@ namespace TowerDefense.EditorTools
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin, basicTower);
-            BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
+            TowerPlacer placer = BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
+            BuildLevelManager(new[] { level1, level2 }, grid, resources, waveManager, placer, board, gameManager);
+            BuildAStarOverlay(grid, pathView, messages, square, diamond, spriteMaterial);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
             SetField(switcher, "grid", grid);
@@ -180,7 +208,7 @@ namespace TowerDefense.EditorTools
         // The floor and spawn/goal markers are drawn by BoardView (square tiles in top-down,
         // diamond tiles in isometric). It is configured here and built once in edit mode;
         // at runtime it rebuilds itself when the projection is switched.
-        private static void BuildBoard(GridManager grid, Sprite square, Sprite diamond, Material material, SkinSet skin)
+        private static BoardView BuildBoard(GridManager grid, Sprite square, Sprite diamond, Sprite wallSquare, Material material, SkinSet skin, LevelData level)
         {
             BoardView board = grid.gameObject.AddComponent<BoardView>();
             SetField(board, "grid", grid);
@@ -198,8 +226,12 @@ namespace TowerDefense.EditorTools
             SetField(board, "ringTint", RingTint);
             SetField(board, "cliffSortingOrder", OrderCliffs);
             SetField(board, "backgroundSortingOrder", OrderBackdrop);
-            SetDecorations(board, PlaceDecorations(grid));
+            SetField(board, "wallSquareSprite", wallSquare);
+            SetField(board, "wallSquareOrder", OrderTowers);
+            SetField(board, "bakedLevel", level);
+            SetDecorations(board, DecorationPlacer.Place(grid, level.decorationSeed, RingWidth, IsoArt.TreeVariants, IsoArt.RockVariants, IsoArt.BushVariants));
             board.Rebuild();
+            return board;
         }
 
         private static void BuildCamera(GridManager grid)
@@ -241,49 +273,120 @@ namespace TowerDefense.EditorTools
             SetField(road, "skin", skin);
             SetField(road, "material", material);
             SetField(road, "sortingOrder", OrderRoad);
-            SerializedObject so = new SerializedObject(road);
-            SerializedProperty cells = so.FindProperty("extraCells");
-            cells.arraySize = 2;
-            cells.GetArrayElementAtIndex(0).vector2IntValue = BoardView.OutsideNeighbour(grid, grid.SpawnCell);
-            cells.GetArrayElementAtIndex(1).vector2IntValue = BoardView.OutsideNeighbour(grid, grid.GoalCell);
-            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        // Trees, rocks and bushes on the decorative ring, placed with a fixed seed. Never on the
-        // portal/gate cells or the ring cells next to them; the two front edges (lower-left
-        // column x = -1 and lower-right row y = -1) get only low rocks and bushes, so nothing
-        // hides the front row of the board.
-        private static List<BoardView.Decoration> PlaceDecorations(GridManager grid)
+        // Applies the selected level at the start of the scene. Goes first in the execution order.
+        private static void BuildLevelManager(LevelData[] levels, GridManager grid, PlayerResources resources, WaveManager waves,
+            TowerPlacer placer, BoardView board, GameManager gameManager)
         {
-            var list = new List<BoardView.Decoration>();
-            System.Random rng = PixelArt.Rng(DecorSeed);
-            Vector2Int portal = BoardView.OutsideNeighbour(grid, grid.SpawnCell);
-            Vector2Int gate = BoardView.OutsideNeighbour(grid, grid.GoalCell);
-            for (int x = -RingWidth; x < grid.Width + RingWidth; x++)
+            LevelManager manager = new GameObject("LevelManager").AddComponent<LevelManager>();
+            SetArray(manager, "levels", levels);
+            SetField(manager, "grid", grid);
+            SetField(manager, "resources", resources);
+            SetField(manager, "waves", waves);
+            SetField(manager, "placer", placer);
+            SetField(manager, "board", board);
+            SetField(manager, "gameManager", gameManager);
+        }
+
+        // The O key: overlay of the cells the last spawn -> goal A* search expanded.
+        private static void BuildAStarOverlay(GridManager grid, PathDebugView pathView, MessageDisplay messages, Sprite square, Sprite diamond, Material material)
+        {
+            AStarOverlay overlay = new GameObject("AStarOverlay").AddComponent<AStarOverlay>();
+            SetField(overlay, "grid", grid);
+            SetField(overlay, "pathView", pathView);
+            SetField(overlay, "messages", messages);
+            SetField(overlay, "squareSprite", square);
+            SetField(overlay, "diamondSprite", diamond);
+            SetField(overlay, "material", material);
+        }
+
+        // ---------------------------------------------------------------- Levels
+
+        // Creates the LevelData asset, or updates it in place (same GUID) if it already exists.
+        private static LevelData CreateLevel(string path, string levelName, List<Vector2Int> walls, int gold, int lives, List<WaveSO> waves, int decorSeed)
+        {
+            LevelData level = AssetDatabase.LoadAssetAtPath<LevelData>(path);
+            if (level == null)
             {
-                for (int y = -RingWidth; y < grid.Height + RingWidth; y++)
+                level = ScriptableObject.CreateInstance<LevelData>();
+                AssetDatabase.CreateAsset(level, path);
+            }
+            level.levelName = levelName;
+            level.width = GridWidth;
+            level.height = GridHeight;
+            level.spawnCell = SpawnCell;
+            level.goalCell = GoalCell;
+            level.wallCells = walls;
+            level.startingGold = gold;
+            level.startingLives = lives;
+            level.waves = waves;
+            level.decorationSeed = decorSeed;
+            EditorUtility.SetDirty(level);
+            return level;
+        }
+
+        // Level 2: 12 wall cells in three short groups that change the path's direction several times.
+        private static List<Vector2Int> SnakeWalls()
+        {
+            var walls = new List<Vector2Int>();
+            for (int y = 3; y <= 6; y++) walls.Add(new Vector2Int(4, y));
+            for (int y = 4; y <= 7; y++) walls.Add(new Vector2Int(8, y));
+            for (int y = 1; y <= 4; y++) walls.Add(new Vector2Int(11, y));
+            return walls;
+        }
+
+        // Level 2: 3 waves, bigger and stronger than Level 1. The last Tanks of each level ramp up
+        // through the health multiplier; base stats are the same as everywhere.
+        private static List<WaveSO> CreateLevel2Waves(EnemySO grunt, EnemySO tank)
+        {
+            return new List<WaveSO>
+            {
+                CreateWave("Level2Wave1", Group(grunt, 10, 1.0f), Group(tank, 2, 3.0f, delayBefore: 2f)),
+                CreateWave("Level2Wave2", Group(grunt, 14, 0.9f), Group(tank, 4, 2.5f, delayBefore: 2f, healthMultiplier: Wave2TankHealth)),
+                CreateWave("Level2Wave3", Group(grunt, 20, 0.7f), Group(tank, 7, 2.0f, delayBefore: 2f, healthMultiplier: EliteTankHealth, elite: true)),
+            };
+        }
+
+        // Every level must have a spawn -> goal path with no towers. Throws, so a broken level
+        // stops the build before anything is saved.
+        private static void AssertLevelsHavePaths()
+        {
+            GameObject temp = new GameObject("LevelCheck");
+            try
+            {
+                GridManager grid = temp.AddComponent<GridManager>();
+                foreach (string path in new[] { Level1Path, Level2Path })
                 {
-                    Vector2Int cell = new Vector2Int(x, y);
-                    if (grid.IsInBounds(cell)) continue;
-                    double r = rng.NextDouble();
-                    Vector2 offset = new Vector2((float)(rng.NextDouble() - 0.5) * 0.4f, (float)(rng.NextDouble() - 0.5) * 0.4f);
-                    if (Chebyshev(cell, portal) <= 1 || Chebyshev(cell, gate) <= 1) continue;
-                    bool front = x < 0 || y < 0;
-                    SkinSlot slot;
-                    if (!front && r < 0.50) slot = SkinSlot.Tree;
-                    else if (r < 0.66) slot = SkinSlot.Rock;
-                    else if (r < 0.80) slot = SkinSlot.Bush;
-                    else continue;
-                    int variants = slot == SkinSlot.Tree ? IsoArt.TreeVariants : slot == SkinSlot.Rock ? IsoArt.RockVariants : IsoArt.BushVariants;
-                    list.Add(new BoardView.Decoration { slot = slot, variant = rng.Next(variants), gridPosition = cell + offset });
+                    LevelData level = AssetDatabase.LoadAssetAtPath<LevelData>(path);
+                    grid.ApplyLevel(level);
+                    foreach (Vector2Int wall in level.wallCells)
+                        if (!grid.IsInBounds(wall) || wall == level.spawnCell || wall == level.goalCell)
+                            throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': bad wall cell {wall}.");
+                    List<Vector2Int> route = new AStarPathfinder(grid).FindPath(level.spawnCell, level.goalCell);
+                    if (route == null)
+                        throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': A* finds NO path from {level.spawnCell} to {level.goalCell}.");
+                    Debug.Log($"[LevelBuilder] Level '{level.levelName}': path of {route.Count} cells including start and goal.");
                 }
             }
-            return list;
+            finally
+            {
+                Object.DestroyImmediate(temp);
+            }
         }
 
-        private static int Chebyshev(Vector2Int a, Vector2Int b)
+        [MenuItem("Tower Defense/Unlock All Levels")]
+        public static void UnlockAllLevels()
         {
-            return Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
+            LevelProgress.UnlockAll(2);
+            Debug.Log("[LevelBuilder] All levels unlocked.");
+        }
+
+        [MenuItem("Tower Defense/Reset Progress")]
+        public static void ResetProgress()
+        {
+            LevelProgress.ResetProgress();
+            Debug.Log("[LevelBuilder] Progress reset: Level 2 is locked until Level 1 is won.");
         }
 
         private static void SetDecorations(BoardView board, List<BoardView.Decoration> list)
@@ -313,7 +416,7 @@ namespace TowerDefense.EditorTools
             return resources;
         }
 
-        private static void BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
+        private static TowerPlacer BuildTowerPlacer(GridManager grid, PlayerResources resources, Tower towerPrefab,
             TowerSO towerData, Sprite square, Sprite diamond, Sprite diamondOutline, Sprite ring, Material material, MessageDisplay messages, GameManager gameManager,
             SkinSet skin)
         {
@@ -363,6 +466,7 @@ namespace TowerDefense.EditorTools
             SetField(placer, "rangeIndicator", indicator);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
+            return placer;
         }
 
         // Game state machine (Playing / Won / Lost), listening to lives and waves.
@@ -403,23 +507,9 @@ namespace TowerDefense.EditorTools
             title.fontStyle = FontStyles.Bold;
             TextMeshProUGUI detail = CreateCenteredText("Detail", panel.transform, "", 44, new Vector2(0f, 10f), new Vector2(1200f, 70f));
 
-            GameObject buttonGo = new GameObject("RestartButton", typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonGo.transform.SetParent(panel.transform, false);
-            RectTransform buttonRect = buttonGo.GetComponent<RectTransform>();
-            buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
-            buttonRect.anchoredPosition = new Vector2(0f, -110f);
-            buttonRect.sizeDelta = new Vector2(360f, 96f);
-            Image buttonImage = buttonGo.GetComponent<Image>();
-            buttonImage.color = new Color(0.30f, 0.75f, 0.95f);
-            buttonImage.type = Image.Type.Sliced; // No effect without a sprite (top-down look unchanged).
-            buttonImage.pixelsPerUnitMultiplier = UiPixelMultiplier;
-            AddSkinnedImage(buttonGo, buttonImage, SkinSlot.HudButton, skin, grid);
-            Button button = buttonGo.GetComponent<Button>();
-            button.targetGraphic = buttonImage;
-            TextMeshProUGUI buttonText = CreateCenteredText("Text", buttonGo.transform, "Restart (R)", 42, Vector2.zero, Vector2.zero);
-            StretchFull(buttonText.rectTransform);
-            buttonText.color = new Color(0.08f, 0.09f, 0.12f);
-            buttonText.raycastTarget = false;
+            Button button = CreatePanelButton("RestartButton", panel.transform, "Restart (R)", skin, grid, out _);
+            Button nextButton = CreatePanelButton("NextButton", panel.transform, "Next level", skin, grid, out TextMeshProUGUI nextText);
+            nextButton.gameObject.SetActive(false); // Shown only on a win, beside Restart.
 
             panel.SetActive(false);
 
@@ -431,7 +521,85 @@ namespace TowerDefense.EditorTools
             SetField(script, "title", title);
             SetField(script, "detail", detail);
             SetField(script, "restartButton", button);
+            SetField(script, "nextButton", nextButton);
+            SetField(script, "nextLabel", nextText);
             return frame.gameObject;
+        }
+
+        // A button of the Win/Lose panel. Its look follows the view (HudButton slot in isometric).
+        private static Button CreatePanelButton(string name, Transform parent, string text, SkinSet skin, GridManager grid, out TextMeshProUGUI label)
+        {
+            GameObject buttonGo = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonGo.transform.SetParent(parent, false);
+            RectTransform buttonRect = buttonGo.GetComponent<RectTransform>();
+            buttonRect.anchorMin = buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            buttonRect.anchoredPosition = new Vector2(0f, -110f);
+            buttonRect.sizeDelta = new Vector2(360f, 96f);
+            Image buttonImage = buttonGo.GetComponent<Image>();
+            buttonImage.color = new Color(0.30f, 0.75f, 0.95f);
+            buttonImage.type = Image.Type.Sliced; // No effect without a sprite (top-down look unchanged).
+            buttonImage.pixelsPerUnitMultiplier = UiPixelMultiplier;
+            AddSkinnedImage(buttonGo, buttonImage, SkinSlot.HudButton, skin, grid);
+            Button button = buttonGo.GetComponent<Button>();
+            button.targetGraphic = buttonImage;
+            label = CreateCenteredText("Text", buttonGo.transform, text, 42, Vector2.zero, Vector2.zero);
+            StretchFull(label.rectTransform);
+            label.color = new Color(0.08f, 0.09f, 0.12f);
+            label.raycastTarget = false;
+            return button;
+        }
+
+        // The level select screen, styled with the isometric HUD panels (in both views): a dark
+        // full-screen layer, a metal frame, and one button per level with a lock and a hint that
+        // LevelSelectPanel shows while the level is locked.
+        private static void BuildLevelSelect(Transform canvas, SkinSet skin)
+        {
+            RectTransform root = UiRect("LevelSelectUI", canvas);
+            StretchFull(root);
+            RectTransform panel = UiRect("Panel", root);
+            StretchFull(panel);
+            Image dim = panel.gameObject.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0f, 0.6f);
+            dim.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
+
+            Image frame = UiImage("Frame", panel, skin.hudPanel, Color.white, true);
+            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 540f));
+            TextMeshProUGUI title = UiText("Title", frame.rectTransform, "SELECT LEVEL", 60, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 180f), new Vector2(760f, 90f), centered: true);
+            title.raycastTarget = false;
+
+            const int count = 2;
+            Button[] buttons = new Button[count];
+            Object[] labels = new Object[count], locks = new Object[count], hints = new Object[count];
+            for (int i = 0; i < count; i++)
+            {
+                float y = 60f - i * 150f;
+                Image image = UiImage($"Level{i + 1}", frame.rectTransform, skin.hudButton, Color.white, true);
+                image.raycastTarget = true;
+                SetRect(image.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(700f, 110f));
+                Button button = image.gameObject.AddComponent<Button>();
+                button.targetGraphic = image;
+                ColorBlock colors = button.colors;
+                colors.disabledColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+                button.colors = colors;
+                TextMeshProUGUI label = UiText("Name", image.rectTransform, "", 44, new Color(0.08f, 0.09f, 0.12f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(520f, 90f), centered: true);
+                Image lockIcon = UiImage("Lock", image.rectTransform, skin.iconLock, Color.white, false);
+                SetRect(lockIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(56f, 70f));
+                TextMeshProUGUI hint = UiText("Hint", frame.rectTransform, $"Win Level {i} to unlock", 30, HudGoldColor, TextAlignmentOptions.Center, new Vector2(0f, y - 76f), new Vector2(700f, 40f), centered: true);
+                lockIcon.gameObject.SetActive(false);
+                hint.gameObject.SetActive(false);
+                buttons[i] = button;
+                labels[i] = label;
+                locks[i] = lockIcon.gameObject;
+                hints[i] = hint.gameObject;
+            }
+            panel.gameObject.SetActive(false);
+
+            LevelSelectPanel script = root.gameObject.AddComponent<LevelSelectPanel>();
+            SetField(script, "panel", panel.gameObject);
+            SetArray(script, "buttons", buttons);
+            SetArray(script, "labels", labels);
+            SetArray(script, "lockIcons", locks);
+            SetArray(script, "lockHints", hints);
         }
 
         private static TextMeshProUGUI CreateCenteredText(string name, Transform parent, string text, float size, Vector2 position, Vector2 boxSize)
@@ -558,6 +726,7 @@ namespace TowerDefense.EditorTools
             GameObject gameOverFrame = BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager, grid, skin);
             BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin, towerData,
                 new[] { labelGo, targetingGo, waveGo, messageGo }, gameOverFrame);
+            BuildLevelSelect(canvasGo.transform, skin);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
@@ -646,7 +815,7 @@ namespace TowerDefense.EditorTools
 
         // --------------------------------------------------------------- Assets
 
-        private enum SpriteShape { Square, Circle, Ring }
+        private enum SpriteShape { Square, Circle, Ring, RoundedSquare }
 
         // Generates a white PNG (tinted later via SpriteRenderer.color) and imports it as a sprite
         // that is exactly 1 world unit wide (pixels per unit = texture size).
@@ -665,13 +834,25 @@ namespace TowerDefense.EditorTools
                 {
                     float d = Vector2.Distance(new Vector2(x, y), center);
                     float alpha;
+                    float brightness = 1f;
                     switch (shape)
                     {
                         case SpriteShape.Square: alpha = 1f; break;
+                        case SpriteShape.RoundedSquare:
+                        {
+                            // Rounded corners and a darker rim, tinted stone at runtime.
+                            float corner = size * 0.22f;
+                            Vector2 q = new Vector2(Mathf.Abs(x - center.x), Mathf.Abs(y - center.y)) - Vector2.one * (radius - corner);
+                            float edge = Mathf.Max(q.x, 0f) * Mathf.Max(q.x, 0f) + Mathf.Max(q.y, 0f) * Mathf.Max(q.y, 0f);
+                            float outside = Mathf.Sqrt(edge) + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - corner;
+                            alpha = outside <= 0f ? 1f : 0f;
+                            brightness = outside > -size * 0.09f ? 0.68f : 1f;
+                            break;
+                        }
                         case SpriteShape.Circle: alpha = d <= radius ? 1f : 0f; break;
                         default: alpha = d > radius ? 0f : (d >= radius - ringWidth ? 1f : 0.12f); break;
                     }
-                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                    tex.SetPixel(x, y, new Color(brightness, brightness, brightness, alpha));
                 }
             }
             tex.Apply();
@@ -902,9 +1083,9 @@ namespace TowerDefense.EditorTools
             };
         }
 
-        private static WaveSO.SpawnGroup Group(EnemySO enemy, int count, float interval, float delayBefore = 0f)
+        private static WaveSO.SpawnGroup Group(EnemySO enemy, int count, float interval, float delayBefore = 0f, float healthMultiplier = 1f, bool elite = false)
         {
-            return new WaveSO.SpawnGroup { enemy = enemy, count = count, spawnInterval = interval, delayBefore = delayBefore };
+            return new WaveSO.SpawnGroup { enemy = enemy, count = count, spawnInterval = interval, delayBefore = delayBefore, healthMultiplier = healthMultiplier, elite = elite };
         }
 
         // Creates the WaveSO asset, or overwrites its groups in place (same GUID) if it exists.
@@ -1162,8 +1343,12 @@ namespace TowerDefense.EditorTools
             TextMeshProUGUI livesText = UiText("Value", lives, "0", 36, HudLivesColor, TextAlignmentOptions.Left, new Vector2(68f, 0f), new Vector2(94f, 56f));
 
             // Wave, top centre.
-            RectTransform wave = UiPanel("WavePanel", root, skin, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(300f, 64f));
+            // Taller than the other panels, for the level name under the wave text (which stays in the same row).
+            RectTransform wave = UiPanel("WavePanel", root, skin, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(300f, 90f));
             TextMeshProUGUI waveText = UiText("Value", wave, "WAVE 1 / 5", 34, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(280f, 56f), centered: true);
+            SetRect(waveText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -32f), new Vector2(280f, 56f));
+            TextMeshProUGUI levelText = UiText("Level", wave, "", 20, HudGoldColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(280f, 26f), centered: true);
+            SetRect(levelText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -68f), new Vector2(280f, 26f));
 
             // Targeting selector, top right: [<] TARGET: FIRST [>].
             RectTransform target = UiPanel("TargetPanel", root, skin, new Vector2(1f, 1f), new Vector2(-20f, -12f), new Vector2(470f, 64f));
@@ -1201,6 +1386,7 @@ namespace TowerDefense.EditorTools
             SetField(hud, "goldText", goldText);
             SetField(hud, "livesText", livesText);
             SetField(hud, "waveText", waveText);
+            SetField(hud, "levelText", levelText);
             SetField(hud, "targetText", targetText);
             SetField(hud, "previousTarget", previous);
             SetField(hud, "nextTarget", next);

@@ -19,6 +19,10 @@ namespace TowerDefense
             [Min(0f)] public float spawnInterval = 1f;
             [Tooltip("Seconds to wait before this group starts spawning.")]
             [Min(0f)] public float delayBefore = 0f;
+            [Tooltip("Multiplies the enemy's base health for this group.")]
+            [Min(0.01f)] public float healthMultiplier = 1f;
+            [Tooltip("Visual only: draw this group with the enemy's elite look. Gameplay comes from the health multiplier.")]
+            public bool elite;
         }
 
         public List<SpawnGroup> groups = new List<SpawnGroup>();

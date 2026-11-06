@@ -11,7 +11,8 @@ namespace TowerDefense.EditorTools
     //   GoblinWalk_0.., OgreWalk_0.., GoblinShadow, OgreShadow, GruntShadow, TankShadow,
     //   SpawnPortal, GoalGate, TowerBody, TowerBase, TowerShadow, Grunt, Tank,
     //   CliffLeft, CliffRight, Projectile, HudPanel, HudButton, Background, HealthBarFrame,
-    //   SpawnPortalGlow, Puff, IconCoin, IconHeart, IconArrow
+    //   SpawnPortalGlow, Puff, IconCoin, IconHeart, IconArrow, IconLock,
+    //   Wall_0.., WallShadow, OgreEliteWalk_0.., OgreEliteShadow, TankElite, TankEliteShadow
     public static class SkinLoader
     {
         // Loads the SkinSet at 'path', or creates it (an existing asset keeps its GUID).
@@ -51,6 +52,13 @@ namespace TowerDefense.EditorTools
                 skin.tankWalk = LoadVariants(folder, "OgreWalk", ref count);
                 skin.gruntCharacterShadow = Load(folder, "GoblinShadow", ref count);
                 skin.tankCharacterShadow = Load(folder, "OgreShadow", ref count);
+                skin.tankEliteWalk = LoadVariants(folder, "OgreEliteWalk", ref count);
+                skin.tankEliteCharacterShadow = Load(folder, "OgreEliteShadow", ref count);
+                skin.tankElite = Load(folder, "TankElite", ref count);
+                skin.tankEliteShadow = Load(folder, "TankEliteShadow", ref count);
+                skin.walls = LoadVariants(folder, "Wall", ref count);
+                skin.wallShadow = Load(folder, "WallShadow", ref count);
+                skin.iconLock = Load(folder, "IconLock", ref count);
                 skin.cliffLeft = Load(folder, "CliffLeft", ref count);
                 skin.cliffRight = Load(folder, "CliffRight", ref count);
                 skin.projectile = Load(folder, "Projectile", ref count);

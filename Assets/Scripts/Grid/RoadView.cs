@@ -17,8 +17,6 @@ namespace TowerDefense
         [SerializeField] private SkinSet skin;
         [SerializeField] private Material material;
         [SerializeField] private int sortingOrder = 1;
-        [Tooltip("Ring cells that are always road (in front of the portal and the gate).")]
-        [SerializeField] private Vector2Int[] extraCells = new Vector2Int[0];
 
         private void OnEnable()
         {
@@ -53,13 +51,15 @@ namespace TowerDefense
             if (grid == null || skin == null || !skin.Has(SkinSlot.PathTile)) return;
             if (grid.ProjectionType != GridProjectionType.Isometric) return;
 
-            var cells = new List<Vector2Int>(extraCells);
+            // The ring cells in front of the portal and the gate are always road.
+            var cells = new List<Vector2Int> { BoardView.OutsideNeighbour(grid, grid.SpawnCell), BoardView.OutsideNeighbour(grid, grid.GoalCell) };
             if (pathView != null && pathView.CurrentPath != null) cells.AddRange(pathView.CurrentPath);
 
             Transform tiles = new GameObject(TilesName).transform;
             tiles.SetParent(transform, false);
             foreach (Vector2Int cell in cells)
             {
+                if (grid.IsPermanent(cell)) continue; // The road never draws on a wall.
                 Sprite sprite = skin.Get(SkinSlot.PathTile, SkinSet.HashVariant(cell.x, cell.y));
                 GameObject go = new GameObject($"Road_{cell.x}_{cell.y}");
                 go.transform.SetParent(tiles, false);

@@ -17,3 +17,5 @@ MonoBehaviour:
     count: 8
     spawnInterval: 1.2
     delayBefore: 0
+    healthMultiplier: 1
+    elite: 0

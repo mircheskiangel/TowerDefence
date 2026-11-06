@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9cbfda6221d75264aa638108732304ae, type: 3}
+  m_Name: Level2
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.LevelData
+  levelName: The Snake
+  width: 16
+  height: 10
+  spawnCell: {x: 0, y: 5}
+  goalCell: {x: 15, y: 4}
+  wallCells:
+  - {x: 4, y: 3}
+  - {x: 4, y: 4}
+  - {x: 4, y: 5}
+  - {x: 4, y: 6}
+  - {x: 8, y: 4}
+  - {x: 8, y: 5}
+  - {x: 8, y: 6}
+  - {x: 8, y: 7}
+  - {x: 11, y: 1}
+  - {x: 11, y: 2}
+  - {x: 11, y: 3}
+  - {x: 11, y: 4}
+  startingGold: 200
+  startingLives: 10
+  waves:
+  - {fileID: 11400000, guid: 22962616a9be792408655f7dac19dbcb, type: 2}
+  - {fileID: 11400000, guid: 9b3944c3aadc3b14887654f52b5ae621, type: 2}
+  - {fileID: 11400000, guid: a4ab654c206b2fb43ac9ac132e48f809, type: 2}
+  decorationSeed: 23

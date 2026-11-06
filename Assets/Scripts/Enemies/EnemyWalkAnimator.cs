@@ -48,7 +48,7 @@ namespace TowerDefense
                 return;
             }
 
-            SkinSlot slot = enemy.Data.walkSlot;
+            SkinSlot slot = enemy.WalkSlot;
             int frames = skin.VariantCount(slot);
             if (frames > 0)
             {

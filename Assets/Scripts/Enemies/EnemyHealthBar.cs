@@ -30,17 +30,25 @@ namespace TowerDefense
         [SerializeField] private SkinSet skin;
 
         private int skinnedWidthPixels = 18;
+        private float plainWidthScale = 1f;
         private float fraction = 1f;
         private bool Skinned => look != null && look.IsSkinned;
         // Pixel bar: fill W x 2 px inside a 1 px dark border, 3 px above the ball.
-        private Vector2 BarSize => Skinned ? new Vector2((skinnedWidthPixels + 2) / pixelsPerUnit, 4f / pixelsPerUnit) : size;
-        private Vector2 FillSize => Skinned ? new Vector2(skinnedWidthPixels / pixelsPerUnit, 2f / pixelsPerUnit) : size;
+        private Vector2 PlainSize => new Vector2(size.x * plainWidthScale, size.y);
+        private Vector2 BarSize => Skinned ? new Vector2((skinnedWidthPixels + 2) / pixelsPerUnit, 4f / pixelsPerUnit) : PlainSize;
+        private Vector2 FillSize => Skinned ? new Vector2(skinnedWidthPixels / pixelsPerUnit, 2f / pixelsPerUnit) : PlainSize;
         private float Gap => Skinned ? 3f / pixelsPerUnit : gapAboveEnemy;
 
         // Fill width of the skinned (isometric) bar in pixels: narrower for a Grunt than a Tank.
         public void SetSkinnedWidth(int pixels)
         {
             skinnedWidthPixels = Mathf.Max(4, pixels);
+        }
+
+        // Width of the plain (top-down) bar relative to its normal width: wider for an elite.
+        public void SetPlainWidthScale(float scale)
+        {
+            plainWidthScale = Mathf.Max(0.1f, scale);
         }
 
         private Color backgroundColor;

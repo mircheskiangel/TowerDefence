@@ -21,6 +21,10 @@ namespace TowerDefense
 
         public List<Vector2Int> CurrentPath { get; private set; }
 
+        // What the last spawn -> goal search expanded (shown by AStarOverlay).
+        public int LastExpandedCount => pathfinder != null ? pathfinder.LastExpandedCount : 0;
+        public bool[,] LastClosed => pathfinder != null ? pathfinder.LastClosed : null;
+
         // Raised after every Recompute (the dirt road redraws from CurrentPath; no extra A*).
         public event System.Action PathChanged;
 

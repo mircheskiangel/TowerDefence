@@ -126,12 +126,21 @@ namespace TowerDefense
             else
                 HideRange();
 
-            // A click on a free, affordable cell always runs the full check again (TryPlaceTower),
-            // because enemies may have moved since the hover result was cached.
-            if (mouse.leftButton.wasPressedThisFrame && free && affordable)
+            if (mouse.leftButton.wasPressedThisFrame) ClickCell(cell);
+        }
+
+        // A click on a grid cell. A free, affordable cell always runs the full check again
+        // (TryPlaceTower), because enemies may have moved since the hover result was cached.
+        // A wall or a tower only gives a message; nothing is ever replaced. Public so the rules
+        // can be tested without a real mouse.
+        public void ClickCell(Vector2Int cell)
+        {
+            if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
                 TryPlaceTower(cell);
-            else if (mouse.leftButton.wasPressedThisFrame && grid.IsBlocked(cell))
-                messages.Show("Cannot build on a wall"); // Message only: a tower already stands here.
+            else if (grid.IsPermanent(cell))
+                messages.Show("Cannot build on a wall");
+            else if (grid.IsBlocked(cell))
+                messages.Show("A tower is already here");
         }
 
         private bool TryGetHoveredCell(Mouse mouse, out Vector2Int cell)

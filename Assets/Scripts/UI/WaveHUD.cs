@@ -4,7 +4,7 @@ using UnityEngine;
 namespace TowerDefense
 {
     // Shows the wave status: "Wave 2/5 starts in 7s (Space to skip)", "Wave 2/5",
-    // "All waves cleared" or "Defeated". The text is only rebuilt when what it shows actually changes
+    // "All waves cleared" or "Defeated", with the level name as a smaller second line. The text is only rebuilt when what it shows actually changes
     // (phase, wave number or whole seconds), so no new string is allocated every frame.
     public class WaveHUD : MonoBehaviour
     {
@@ -35,19 +35,20 @@ namespace TowerDefense
             shownWave = wave;
             shownSeconds = seconds;
 
+            string level = LevelManager.Instance != null ? $"\n<size=70%>{LevelManager.Instance.Current.levelName}</size>" : "";
             switch (phase)
             {
                 case Phase.Countdown:
-                    label.text = $"Wave {wave}/{waves.TotalWaves} starts in {seconds}s (Space to skip)";
+                    label.text = $"Wave {wave}/{waves.TotalWaves} starts in {seconds}s (Space to skip){level}";
                     break;
                 case Phase.Wave:
-                    label.text = $"Wave {wave}/{waves.TotalWaves}";
+                    label.text = $"Wave {wave}/{waves.TotalWaves}{level}";
                     break;
                 case Phase.AllCleared:
-                    label.text = "All waves cleared";
+                    label.text = "All waves cleared" + level;
                     break;
                 case Phase.Defeated:
-                    label.text = "Defeated";
+                    label.text = "Defeated" + level;
                     break;
                 default:
                     label.text = "";

@@ -4,8 +4,9 @@ using UnityEngine;
 
 namespace TowerDefense
 {
-    // Owns the logical cell grid of the level: size, which cells are blocked (by towers),
-    // the spawn/goal cells, and the ONLY projection between grid and world coordinates.
+    // Owns the logical cell grid of the level: size, which cells are blocked (by towers) or
+    // permanent walls, the spawn/goal cells, and the ONLY projection between grid and world
+    // coordinates.
     // Gameplay works in grid coordinates; every grid <-> world conversion goes through here.
     public class GridManager : MonoBehaviour
     {
@@ -24,6 +25,7 @@ namespace TowerDefense
         [SerializeField] private bool drawDebugGrid = true;
 
         private bool[,] blocked;
+        private bool[,] permanent; // Walls of the level: stay blocked whatever happens to 'blocked'.
         private IGridProjection projection;
 
         // Raised whenever a cell changes between walkable and blocked.
@@ -95,6 +97,21 @@ namespace TowerDefense
             projection = null;
         }
 
+        // Takes size, spawn, goal and walls from the level. Called by LevelManager before any other
+        // script's Awake. Keeps the projection, cell size and origin.
+        public void ApplyLevel(LevelData level)
+        {
+            width = level.width;
+            height = level.height;
+            spawnCell = level.spawnCell;
+            goalCell = level.goalCell;
+            blocked = new bool[width, height];
+            permanent = new bool[width, height];
+            foreach (Vector2Int cell in level.wallCells)
+                if (IsInBounds(cell)) permanent[cell.x, cell.y] = true;
+            projection = null;
+        }
+
         // ------------------------------------------------------------- Cell state
 
         public bool IsInBounds(Vector2Int cell)
@@ -110,12 +127,18 @@ namespace TowerDefense
         public bool IsBlocked(Vector2Int cell)
         {
             EnsureArray();
-            return IsInBounds(cell) && blocked[cell.x, cell.y];
+            return IsInBounds(cell) && (blocked[cell.x, cell.y] || IsPermanent(cell));
+        }
+
+        // A wall of the level: blocked for A*, cannot be built on, sold or replaced.
+        public bool IsPermanent(Vector2Int cell)
+        {
+            return permanent != null && IsInBounds(cell) && permanent[cell.x, cell.y];
         }
 
         public void SetBlocked(Vector2Int cell, bool value)
         {
-            if (!IsInBounds(cell)) return;
+            if (!IsInBounds(cell) || IsPermanent(cell)) return;
             EnsureArray();
             if (blocked[cell.x, cell.y] == value) return;
             blocked[cell.x, cell.y] = value;
@@ -127,7 +150,7 @@ namespace TowerDefense
         // must restore the original value afterwards, so nobody else ever sees the change.
         public void SetBlockedSilently(Vector2Int cell, bool value)
         {
-            if (!IsInBounds(cell)) return;
+            if (!IsInBounds(cell) || IsPermanent(cell)) return;
             EnsureArray();
             blocked[cell.x, cell.y] = value;
         }
@@ -139,7 +162,7 @@ namespace TowerDefense
             bool changed = false;
             foreach (Vector2Int cell in cells)
             {
-                if (!IsInBounds(cell) || blocked[cell.x, cell.y] == value) continue;
+                if (!IsInBounds(cell) || IsPermanent(cell) || blocked[cell.x, cell.y] == value) continue;
                 blocked[cell.x, cell.y] = value;
                 changed = true;
             }
@@ -242,6 +265,10 @@ namespace TowerDefense
                     for (int x = 0; x < width; x++)
                         for (int y = 0; y < height; y++)
                             if (blocked[x, y]) DrawCellOutline(new Vector2Int(x, y), 0.45f);
+                    Gizmos.color = new Color(0.75f, 0.75f, 0.8f, 0.9f);
+                    for (int x = 0; x < width; x++)
+                        for (int y = 0; y < height; y++)
+                            if (IsPermanent(new Vector2Int(x, y))) DrawCellOutline(new Vector2Int(x, y), 0.35f);
                 }
                 Gizmos.color = Color.green;
                 DrawCellOutline(spawnCell, 0.45f);
@@ -257,6 +284,10 @@ namespace TowerDefense
                 for (int x = 0; x < width; x++)
                     for (int y = 0; y < height; y++)
                         if (blocked[x, y]) Gizmos.DrawCube(CellToWorld(new Vector2Int(x, y)), size);
+                Gizmos.color = new Color(0.75f, 0.75f, 0.8f, 0.6f);
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
+                        if (IsPermanent(new Vector2Int(x, y))) Gizmos.DrawCube(CellToWorld(new Vector2Int(x, y)), size * 0.75f);
             }
 
             Gizmos.color = Color.green;

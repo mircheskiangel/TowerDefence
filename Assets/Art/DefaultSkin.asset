@@ -63,6 +63,17 @@ MonoBehaviour:
   - {fileID: 21300000, guid: a840aa8c0eebc3f47bd84bf1a7448680, type: 3}
   gruntCharacterShadow: {fileID: 21300000, guid: b290b10db5f56d34da962f155035bf6f, type: 3}
   tankCharacterShadow: {fileID: 21300000, guid: 5255b0d253c491345a20beea6e1d9a71, type: 3}
+  tankEliteWalk:
+  - {fileID: 21300000, guid: 7e68b07fb1c79724eaa5d99398fef23a, type: 3}
+  - {fileID: 21300000, guid: a6c217494453db449a6f4c2da7f97419, type: 3}
+  tankEliteCharacterShadow: {fileID: 21300000, guid: f91bf90c071203d45839737fee949c51, type: 3}
+  tankElite: {fileID: 21300000, guid: cbf930889a1168f4bbbd67c5fa8c40e3, type: 3}
+  tankEliteShadow: {fileID: 21300000, guid: e78444eb13492b94ba85eb02d2bcec1e, type: 3}
+  walls:
+  - {fileID: 21300000, guid: eb9745abe17708c41933f0842d4febae, type: 3}
+  - {fileID: 21300000, guid: 01f8d25847ee31b4ca7b03a7ad25f9f8, type: 3}
+  - {fileID: 21300000, guid: d849057fa6e2ccb408993dcc87bb9283, type: 3}
+  wallShadow: {fileID: 21300000, guid: c0cc76bc74b1bd246a24640aaf8bcecc, type: 3}
   trees:
   - {fileID: 21300000, guid: 27409e34daa0e4040abb57ca35da2283, type: 3}
   - {fileID: 21300000, guid: 18c480f2505b3d740864435a5cd54cf3, type: 3}
@@ -78,6 +89,7 @@ MonoBehaviour:
   iconCoin: {fileID: 21300000, guid: 4ef5994764b843245870428976467997, type: 3}
   iconHeart: {fileID: 21300000, guid: 49b6402c580e9ca4d86308f02c43328f, type: 3}
   iconArrow: {fileID: 21300000, guid: a9484e151b3b7684db186475d7d43395, type: 3}
+  iconLock: {fileID: 21300000, guid: 73bff1fc4bef522419b2cf283f9a8e8a, type: 3}
   healthBarFrame: {fileID: 21300000, guid: 9610a59e8089c604ba224f66adec555d, type: 3}
   portalGlow: {fileID: 21300000, guid: 2e32ab7a5360c4144ab278ff44a0db78, type: 3}
   puff: {fileID: 21300000, guid: 8669eb0cdc23ab94cb026868b572877c, type: 3}

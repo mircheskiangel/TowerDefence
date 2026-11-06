@@ -21,6 +21,13 @@ namespace TowerDefense
         // Raised exactly once, when lives drop to 0.
         public event Action LivesDepleted;
 
+        // Starting values of the level. Called by LevelManager before this object's Awake.
+        public void Configure(int gold, int lives)
+        {
+            startGold = gold;
+            startLives = lives;
+        }
+
         private void Awake()
         {
             // Always take over: after a scene reload the old instance may not be destroyed yet.

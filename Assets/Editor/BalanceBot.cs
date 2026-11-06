@@ -11,6 +11,7 @@ namespace TowerDefense.EditorTools
     // spending only earned gold. Results go to the Console and to Logs/BalanceBot.txt.
     //
     // Usage (in Play mode):  BalanceBot.StartBatch("none,weak,reasonable,maze", 2);
+    // It plays any level, locked or not, and never changes the player's unlock progress.
     public static class BalanceBot
     {
         private enum Phase { Idle, WaitingForLevel, Running }
@@ -23,6 +24,7 @@ namespace TowerDefense.EditorTools
         private static readonly Dictionary<string, int> runCounter = new Dictionary<string, int>();
         private static float speed = 4f;
         private static GridProjectionType? projectionOverride;
+        private static int levelIndex;
         private static bool previousRunInBackground;
 
         // Current run
@@ -41,7 +43,8 @@ namespace TowerDefense.EditorTools
         public static readonly List<string> Results = new List<string>();
 
         // projection: draw the board with this projection in every run (null = as the scene is built).
-        public static void StartBatch(string strategies, int repeats, float timeScale = 4f, GridProjectionType? projection = null)
+        // level: index of the level to play (0 = Level 1, 1 = Level 2).
+        public static void StartBatch(string strategies, int repeats, float timeScale = 4f, GridProjectionType? projection = null, int level = 0)
         {
             if (!EditorApplication.isPlaying) { Debug.LogError("[BalanceBot] Enter Play mode first."); return; }
             if (IsRunning) { Debug.LogWarning("[BalanceBot] A batch is already running."); return; }
@@ -56,12 +59,17 @@ namespace TowerDefense.EditorTools
             projectionOverride = projection;
             previousRunInBackground = Application.runInBackground;
             Application.runInBackground = true; // Session only; not saved in Player Settings.
-            previousGameManager = null;
+            levelIndex = level;
+            LevelProgress.Recording = false;
             phase = Phase.WaitingForLevel;
             EditorApplication.update += Tick;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             string view = projection.HasValue ? projection.Value.ToString() : "scene default";
-            File.AppendAllText(ResultsPath, $"\n=== Batch {System.DateTime.Now:HH:mm:ss}: {strategies} x{repeats} at {timeScale}x, view {view} ===\n");
+            File.AppendAllText(ResultsPath, $"\n=== Batch {System.DateTime.Now:HH:mm:ss}: {strategies} x{repeats} at {timeScale}x, view {view}, level {level + 1} ===\n");
+            // Reload into the chosen level (the scene may be on the level select screen).
+            previousGameManager = Object.FindAnyObjectByType<GameManager>();
+            LevelSession.Select(level);
+            if (previousGameManager != null) previousGameManager.Restart();
             Debug.Log($"[BalanceBot] Batch started: {queue.Count} runs.");
         }
 
@@ -72,6 +80,7 @@ namespace TowerDefense.EditorTools
             Enemy.OnDied -= CountKill;
             if (phase != Phase.Idle)
             {
+                LevelProgress.Recording = true;
                 Time.timeScale = 1f;
                 Application.runInBackground = previousRunInBackground;
             }
@@ -134,7 +143,7 @@ namespace TowerDefense.EditorTools
                 GridManager grid = Object.FindAnyObjectByType<GridManager>();
                 if (grid != null) grid.SetProjection(projectionOverride.Value);
             }
-            plan = BuildPlan(strategy, out maxTowers);
+            plan = levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers) : BuildPlan(strategy, out maxTowers);
             planIndex = 0;
             towersPlaced = goldSpent = kills = 0;
             Enemy.OnDied += CountKill; // GameManager cleared old subscribers when this level started.
@@ -152,6 +161,9 @@ namespace TowerDefense.EditorTools
                 "{0,-10} #{1}  {2,-7} lives {3,2}  wave {4}/{5}  towers {6,2}  spent {7,4}  goldLeft {8,4}  kills {9,3}  gameTime {10,5:F0}s  real {11,4:F0}s",
                 strategy, runCounter[strategy], result, resources.Lives, waves.CurrentWaveNumber, waves.TotalWaves,
                 towersPlaced, goldSpent, resources.Gold, kills, Time.timeSinceLevelLoad, Time.realtimeSinceStartup - realStart);
+            GridManager endGrid = Object.FindAnyObjectByType<GridManager>();
+            List<Vector2Int> endPath = endGrid != null ? new AStarPathfinder(endGrid).FindPath(endGrid.SpawnCell, endGrid.GoalCell) : null;
+            line += $"  path {(endPath != null ? endPath.Count : 0)}";
             Results.Add(line);
             File.AppendAllText(ResultsPath, line + "\n");
             Debug.Log("[BalanceBot] " + line);
@@ -216,6 +228,61 @@ namespace TowerDefense.EditorTools
             Debug.LogError("[BalanceBot] Unknown strategy: " + name);
             towerLimit = 0;
             return new List<Vector2Int>();
+        }
+
+        // Level 2 "The Snake": walls at x=4 y=3..6, x=8 y=4..7, x=11 y=1..4.
+        private static List<Vector2Int> BuildSnakePlan(string name, out int towerLimit)
+        {
+            towerLimit = int.MaxValue;
+            switch (name)
+            {
+                case "none":
+                    towerLimit = 0;
+                    return new List<Vector2Int>();
+
+                case "weak": // 4 towers in one clump next to the middle of the path.
+                    towerLimit = 4;
+                    return Cells((6, 4), (7, 4), (6, 5), (7, 5));
+
+                case "reasonable": // Towers beside the current path, spread from the spawn side outwards.
+                    return CellsBesidePath();
+
+                case "maze": // Opens like "reasonable", which holds waves 1 and 2. Later gold builds a detour in the
+                             // corridor between the first two walls: closing the first wall's lower gap and the
+                             // second wall's upper gap makes the path enter high and leave low, and two baffles
+                             // make it zigzag on the way down, past the towers already there.
+                {
+                    List<Vector2Int> beside = CellsBesidePath();
+                    List<Vector2Int> cells = beside.GetRange(0, Mathf.Min(12, beside.Count));
+                    cells.AddRange(Cells((8, 8), (8, 9), (4, 2), (4, 1), (4, 0), (5, 6), (6, 6)));
+                    cells.AddRange(beside);
+                    return cells;
+                }
+            }
+            Debug.LogError("[BalanceBot] Unknown strategy: " + name);
+            towerLimit = 0;
+            return new List<Vector2Int>();
+        }
+
+        // Free cells next to the spawn -> goal path: first beside every second path cell from the
+        // spawn outwards, then beside the others. None of them is on the path, so it never changes.
+        private static List<Vector2Int> CellsBesidePath()
+        {
+            GridManager grid = Object.FindAnyObjectByType<GridManager>();
+            List<Vector2Int> path = new AStarPathfinder(grid).FindPath(grid.SpawnCell, grid.GoalCell);
+            var cells = new List<Vector2Int>();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int i = 2 + pass; i < path.Count - 1; i += 2)
+                {
+                    foreach (Vector2Int dir in new[] { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right })
+                    {
+                        Vector2Int cell = path[i] + dir;
+                        if (grid.IsWalkable(cell) && !path.Contains(cell) && !cells.Contains(cell)) cells.Add(cell);
+                    }
+                }
+            }
+            return cells;
         }
 
         private static List<Vector2Int> Cells(params (int x, int y)[] cells)

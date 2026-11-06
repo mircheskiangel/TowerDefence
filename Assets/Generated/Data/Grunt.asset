@@ -24,3 +24,10 @@ MonoBehaviour:
   characterShadowSlot: 30
   walkFrameSeconds: 0.18
   healthBarPixels: 18
+  eliteSkinSlot: 0
+  eliteSkinShadowSlot: 0
+  eliteWalkSlot: 0
+  eliteCharacterShadowSlot: 0
+  eliteColor: {r: 1, g: 1, b: 1, a: 1}
+  eliteScale: 1
+  eliteHealthBarPixels: 0

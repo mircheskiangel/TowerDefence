@@ -17,7 +17,11 @@ MonoBehaviour:
     count: 6
     spawnInterval: 1.2
     delayBefore: 0
+    healthMultiplier: 1
+    elite: 0
   - enemy: {fileID: 11400000, guid: ff381828c7ff7ec4bb27ec36e6d189ae, type: 2}
     count: 2
     spawnInterval: 3
     delayBefore: 2
+    healthMultiplier: 1
+    elite: 0
