@@ -106,7 +106,7 @@ namespace TowerDefense
             {
                 int barPixels = elite && data.eliteHealthBarPixels > 0 ? data.eliteHealthBarPixels : data.healthBarPixels;
                 healthBar.SetSkinnedWidth(barPixels);
-                healthBar.SetPlainWidthScale((float)barPixels / data.healthBarPixels);
+                healthBar.SetPlainWidthScale((float)barPixels / data.healthBarPixels * data.topDownBarScale);
             }
             if (look != null) look.Apply(grid);           // Before the bar: it sits on top of the current sprite.
             if (hitFlash != null) hitFlash.SetBaseColor(body != null ? body.color : tint); // Tint or untinted skin.
@@ -283,7 +283,7 @@ namespace TowerDefense
             Deactivate();
             // Visual only (isometric skin): a fading copy of the ball and its shadow; the enemy
             // itself is removed exactly as before.
-            if (look != null && look.IsSkinned) VisualFade.Spawn(0.25f, 1.3f, body, shadowSkin != null ? shadowSkin.GetComponent<SpriteRenderer>() : null);
+            if (look != null && look.IsSkinned) VisualFade.Spawn(data.deathFadeSeconds, 1.3f, body, shadowSkin != null ? shadowSkin.GetComponent<SpriteRenderer>() : null);
             OnDied?.Invoke(this);
             if (PlayerResources.Instance != null) PlayerResources.Instance.AddGold(data.goldReward);
             Destroy(gameObject);

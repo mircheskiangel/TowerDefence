@@ -23,6 +23,7 @@ namespace TowerDefense
         private Transform container;
         private Coroutine routine;
         private bool skipRequested;
+        private EnemySO lastBoss; // The end of the level waits for its death fade.
 
         // --- Read-only state for the UI ---
         public int CurrentWaveNumber { get; private set; }   // 1-based; 0 before the first wave.
@@ -36,6 +37,7 @@ namespace TowerDefense
         public event Action<int> WaveStarted;
         public event Action<int> WaveCleared;
         public event Action AllWavesCleared;
+        public event Action<Enemy> EnemySpawned;
 
         // The waves of the level. Called by LevelManager before this object's Start.
         public void SetWaves(List<WaveSO> levelWaves)
@@ -103,6 +105,8 @@ namespace TowerDefense
                 WaveCleared?.Invoke(CurrentWaveNumber);
             }
 
+            if (lastBoss != null) yield return new WaitForSeconds(lastBoss.deathFadeSeconds);
+
             AllCleared = true;
             routine = null;
             AllWavesCleared?.Invoke();
@@ -143,6 +147,8 @@ namespace TowerDefense
         {
             Enemy enemy = Instantiate(enemyPrefab, grid.CellToWorld(grid.SpawnCell), Quaternion.identity, container);
             enemy.Initialize(group.enemy, grid, pathfinder, group.healthMultiplier, group.elite);
+            if (group.enemy.isBoss) lastBoss = group.enemy;
+            EnemySpawned?.Invoke(enemy);
         }
 
         // Safety stop: without it the coroutine would keep spawning (and the "wave cleared"

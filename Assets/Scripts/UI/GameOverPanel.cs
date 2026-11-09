@@ -23,6 +23,10 @@ namespace TowerDefense
         [SerializeField] private TMP_Text nextLabel;
         [SerializeField] private float buttonSpacing = 200f;
 
+        private const float VictoryTitleSize = 46f;
+        private const float VictoryTitleLift = 12f;
+        private const float VictoryDetailSize = 38f;
+
         private Vector2 restartHome;
 
         private void Awake()
@@ -61,15 +65,31 @@ namespace TowerDefense
 
             if (state == GameState.Won)
             {
-                title.text = "YOU WIN!";
-                detail.text = $"Lives left: {(resources != null ? resources.Lives : 0)}";
+                int lives = resources != null ? resources.Lives : 0;
+                string victory = LevelManager.Instance != null ? LevelManager.Instance.Current.victoryTitle : "";
+                if (string.IsNullOrEmpty(victory))
+                {
+                    title.text = "YOU WIN!";
+                    detail.text = $"Lives left: {lives}";
+                }
+                else
+                {
+                    title.text = victory;
+                    title.fontSize = VictoryTitleSize;
+                    title.rectTransform.anchoredPosition += Vector2.up * VictoryTitleLift;
+                    detail.fontSize = VictoryDetailSize;
+                    detail.text = $"Game complete\nLives left: {lives}";
+                }
             }
             else if (state == GameState.Lost)
             {
                 title.text = "GAME OVER";
                 int wave = waves != null ? Mathf.Max(1, waves.CurrentWaveNumber) : 0;
                 int total = waves != null ? waves.TotalWaves : 0;
-                detail.text = $"Reached wave {wave} of {total}";
+                LivesHandler livesHandler = resources != null ? resources.GetComponent<LivesHandler>() : null;
+                detail.text = livesHandler != null && !string.IsNullOrEmpty(livesHandler.InstantDefeatMessage)
+                    ? livesHandler.InstantDefeatMessage
+                    : $"Reached wave {wave} of {total}";
             }
         }
 

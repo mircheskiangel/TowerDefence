@@ -73,6 +73,12 @@ MonoBehaviour:
   siegeShadow: {fileID: 21300000, guid: 2a84a8dda5c99334a928d9fb79108171, type: 3}
   siegeProjectile: {fileID: 21300000, guid: 35caa88b2b6de82489e2aba2d3c47fc1, type: 3}
   siegeBodyPlain: {fileID: 21300000, guid: 5b710a699b70faa4ca5f0d4eae522a97, type: 3}
+  bossWalk:
+  - {fileID: 21300000, guid: a0831fed4e6595249971ebf38c6a73a9, type: 3}
+  - {fileID: 21300000, guid: 603e395fe9b54cd458adb150dd3cef46, type: 3}
+  bossCharacterShadow: {fileID: 21300000, guid: 526e901e68fa4ed4dbc182ad80673a76, type: 3}
+  bossBall: {fileID: 21300000, guid: 69627543a81961c4bbeb9590b4cabd0a, type: 3}
+  bossBallShadow: {fileID: 21300000, guid: cb1200358262aed4bae3c0f5bb78826e, type: 3}
   walls:
   - {fileID: 21300000, guid: eb9745abe17708c41933f0842d4febae, type: 3}
   - {fileID: 21300000, guid: 01f8d25847ee31b4ca7b03a7ad25f9f8, type: 3}

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 516acbb1c7639fe44adbbb077e36fe51, type: 3}
+  m_Name: Colossus
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.EnemySO
+  displayName: Colossus
+  maxHealth: 4600
+  moveSpeed: 0.453
+  goldReward: 0
+  color: {r: 0.15686275, g: 0.78431374, b: 0.78431374, a: 1}
+  scale: 1.6
+  skinSlot: 45
+  skinShadowSlot: 46
+  walkSlot: 43
+  characterShadowSlot: 44
+  walkFrameSeconds: 0.45
+  healthBarPixels: 60
+  eliteSkinSlot: 0
+  eliteSkinShadowSlot: 0
+  eliteWalkSlot: 0
+  eliteCharacterShadowSlot: 0
+  eliteColor: {r: 1, g: 1, b: 1, a: 1}
+  eliteScale: 1
+  eliteHealthBarPixels: 0
+  isBoss: 1
+  instantDefeatOnLeak: 1
+  defeatMessage: The Colossus reached the goal!
+  deathFadeSeconds: 1
+  topDownBarScale: 2

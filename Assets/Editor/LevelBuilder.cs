@@ -29,7 +29,8 @@ namespace TowerDefense.EditorTools
         private const string Level2Path = LevelsFolder + "/Level2.asset";
         private const string Level3Path = LevelsFolder + "/Level3.asset";
         private const string Level4Path = LevelsFolder + "/Level4.asset";
-        private static readonly string[] LevelPaths = { Level1Path, Level2Path, Level3Path, Level4Path };
+        private const string Level5Path = LevelsFolder + "/Level5.asset";
+        private static readonly string[] LevelPaths = { Level1Path, Level2Path, Level3Path, Level4Path, Level5Path };
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
@@ -77,6 +78,16 @@ namespace TowerDefense.EditorTools
         private const float Level4Wave2TankHealth = 1.3f;
         private const float Level4Wave3TankHealth = 1.5f;
         private const float Level4EliteTankHealth = 2.0f;
+
+        // --- Level 5 "The Citadel" (tuned with BalanceBot; everything else stays as it is) ---
+        private const int Level5Gold = 400;
+        private const int Level5Lives = 10;
+        private const int Level5DecorSeed = 71;
+        private const float Level5Wave1TankHealth = 1.0f;
+        private const float Level5Wave2TankHealth = 1.2f;
+        private const float Level5EliteTankHealth = 1.5f;
+        private const float BossHealth = 4600f;
+        private const float BossSpeed = 0.453f;
 
         // The most tower cards a level can show (one per allowed tower).
         private const int MaxTowerCards = 2;
@@ -203,6 +214,26 @@ namespace TowerDefense.EditorTools
                     new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(13, 8) },
                 },
                 new List<LevelData.TowerLimit> { new LevelData.TowerLimit { tower = siegeCannon, maxCount = Level4SiegeLimit } });
+            // The Colossus: built from the same pipeline as every enemy; its rules are flags on the data.
+            EnemySO colossus = CreateEnemyData("Colossus", maxHealth: BossHealth, moveSpeed: BossSpeed, goldReward: 0,
+                new Color(40f / 255f, 200f / 255f, 200f / 255f), scale: 1.6f, SkinSlot.BossBall, SkinSlot.BossBallShadow, IsoArt.BossBarPixels,
+                SkinSlot.BossWalk, SkinSlot.BossCharacterShadow, walkFrameSeconds: 0.45f);
+            colossus.isBoss = true;
+            colossus.instantDefeatOnLeak = true;
+            colossus.defeatMessage = "The Colossus reached the goal!";
+            colossus.deathFadeSeconds = 1f;
+            colossus.topDownBarScale = 2f;
+            EditorUtility.SetDirty(colossus);
+            LevelData citadel = CreateLevel(Level5Path, "The Citadel", GauntletWalls(), Level5Gold, Level5Lives, CreateLevel5Waves(tank, colossus), Level5DecorSeed,
+                new List<TowerSO> { basicTower, siegeCannon },
+                new List<LevelData.FixedTower>
+                {
+                    new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(4, 7) },
+                    new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(12, 7) },
+                });
+            citadel.finalWaveMessage = "FINAL WAVE";
+            citadel.victoryTitle = "VICTORY!\nYOU DEFEATED THE COLOSSUS";
+            EditorUtility.SetDirty(citadel);
             AssertLevelsAreValid();
             CreateProjectilePrefab(circle, spriteMaterial, skin); // Before the tower prefab, which references it.
             CreateTowerPrefab(square, circle, towerIso, towerBase, shadow, spriteMaterial, skin);
@@ -218,6 +249,7 @@ namespace TowerDefense.EditorTools
             LevelData level2 = AssetDatabase.LoadAssetAtPath<LevelData>(Level2Path);
             LevelData level3 = AssetDatabase.LoadAssetAtPath<LevelData>(Level3Path);
             LevelData level4 = AssetDatabase.LoadAssetAtPath<LevelData>(Level4Path);
+            LevelData level5 = AssetDatabase.LoadAssetAtPath<LevelData>(Level5Path);
             grid.Configure(level1.width, level1.height, CellSize, Vector2.zero, level1.spawnCell, level1.goalCell, startProjection);
             BoardView board = BuildBoard(grid, square, diamond, wallSquare, spriteMaterial, skin, level1);
 
@@ -241,7 +273,8 @@ namespace TowerDefense.EditorTools
             MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin);
             TowerPlacer placer = BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
             BuildTowerSelector(messages.transform.parent, grid, resources, placer, skin);
-            BuildLevelManager(new[] { level1, level2, level3, level4 }, grid, resources, waveManager, placer, board, gameManager);
+            BuildBossBar(messages.transform.parent, grid, waveManager, messages, skin);
+            BuildLevelManager(new[] { level1, level2, level3, level4, level5 }, grid, resources, waveManager, placer, board, gameManager);
             BuildAStarOverlay(grid, pathView, messages, square, diamond, spriteMaterial);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
@@ -413,6 +446,17 @@ namespace TowerDefense.EditorTools
             for (int y = 1; y <= 4; y++) walls.Add(new Vector2Int(11, y));
             for (int y = 6; y <= 7; y++) walls.Add(new Vector2Int(13, y));
             return walls;
+        }
+
+        // Level 5: the final level. Only Tanks, and the last wave ends with the Colossus.
+        private static List<WaveSO> CreateLevel5Waves(EnemySO tank, EnemySO boss)
+        {
+            return new List<WaveSO>
+            {
+                CreateWave("Level5Wave1", Group(tank, 6, 2.5f, healthMultiplier: Level5Wave1TankHealth)),
+                CreateWave("Level5Wave2", Group(tank, 6, 2.0f, healthMultiplier: Level5Wave2TankHealth), Group(tank, 3, 2.0f, delayBefore: 3f, healthMultiplier: Level5EliteTankHealth, elite: true)),
+                CreateWave("Level5Wave3", Group(tank, 4, 2.5f, healthMultiplier: Level5EliteTankHealth, elite: true), Group(boss, 1, 1f, delayBefore: 4f)),
+            };
         }
 
         // Level 4: 3 waves; the third has only Tanks, which is what the Siege Cannons are for.
@@ -678,8 +722,8 @@ namespace TowerDefense.EditorTools
             dim.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
 
             Image frame = UiImage("Frame", panel, skin.hudPanel, Color.white, true);
-            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 850f));
-            TextMeshProUGUI title = UiText("Title", frame.rectTransform, "SELECT LEVEL", 60, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 345f), new Vector2(760f, 90f), centered: true);
+            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 860f));
+            TextMeshProUGUI title = UiText("Title", frame.rectTransform, "SELECT LEVEL", 60, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 360f), new Vector2(760f, 90f), centered: true);
             title.raycastTarget = false;
 
             int count = LevelPaths.Length;
@@ -687,10 +731,10 @@ namespace TowerDefense.EditorTools
             Object[] labels = new Object[count], locks = new Object[count], hints = new Object[count];
             for (int i = 0; i < count; i++)
             {
-                float y = 215f - i * 155f;
+                float y = 240f - i * 132f;
                 Image image = UiImage($"Level{i + 1}", frame.rectTransform, skin.hudButton, Color.white, true);
                 image.raycastTarget = true;
-                SetRect(image.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(700f, 110f));
+                SetRect(image.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(700f, 88f));
                 Button button = image.gameObject.AddComponent<Button>();
                 button.targetGraphic = image;
                 ColorBlock colors = button.colors;
@@ -698,8 +742,8 @@ namespace TowerDefense.EditorTools
                 button.colors = colors;
                 TextMeshProUGUI label = UiText("Name", image.rectTransform, "", 44, new Color(0.08f, 0.09f, 0.12f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(520f, 90f), centered: true);
                 Image lockIcon = UiImage("Lock", image.rectTransform, skin.iconLock, Color.white, false);
-                SetRect(lockIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(56f, 70f));
-                TextMeshProUGUI hint = UiText("Hint", frame.rectTransform, $"Win Level {i} to unlock", 30, HudGoldColor, TextAlignmentOptions.Center, new Vector2(0f, y - 74f), new Vector2(700f, 40f), centered: true);
+                SetRect(lockIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(48f, 60f));
+                TextMeshProUGUI hint = UiText("Hint", frame.rectTransform, $"Win Level {i} to unlock", 30, HudGoldColor, TextAlignmentOptions.Center, new Vector2(0f, y - 63f), new Vector2(700f, 36f), centered: true);
                 lockIcon.gameObject.SetActive(false);
                 hint.gameObject.SetActive(false);
                 buttons[i] = button;
@@ -824,7 +868,7 @@ namespace TowerDefense.EditorTools
             messageRect.anchorMin = messageRect.anchorMax = new Vector2(0.5f, 0f);
             messageRect.pivot = new Vector2(0.5f, 0f);
             messageRect.anchoredPosition = new Vector2(0f, 10f);
-            messageRect.sizeDelta = new Vector2(900f, 70f);
+            messageRect.sizeDelta = new Vector2(1500f, 70f); // Wide enough for the longest message on one line.
 
             TextMeshProUGUI messageLabel = messageGo.AddComponent<TextMeshProUGUI>();
             messageLabel.text = "";
@@ -1520,6 +1564,28 @@ namespace TowerDefense.EditorTools
             SetField(hud, "nextTarget", next);
             SetField(hud, "bottomPanel", bottomGroup);
             SetField(hud, "bottomText", bottomText);
+        }
+
+        // The large boss bar, used in both views; BossBar shows it while a boss is alive.
+        private static void BuildBossBar(Transform canvas, GridManager grid, WaveManager waves, MessageDisplay messages, SkinSet skin)
+        {
+            RectTransform holder = UiRect("BossBar", canvas);
+            StretchFull(holder);
+            holder.SetAsFirstSibling(); // Under the Game Over overlay and the level select screen.
+
+            Image frame = UiImage("Frame", holder, skin.hudPanel, Color.white, true);
+            SetRect(frame.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -112f), new Vector2(640f, 58f));
+            Image fill = UiImage("Fill", frame.rectTransform, null, new Color(0.10f, 0.58f, 0.60f), false);
+            SetRect(fill.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(624f, 42f));
+            TextMeshProUGUI label = UiText("Label", frame.rectTransform, "", 28, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(620f, 44f), centered: true);
+
+            BossBar bar = holder.gameObject.AddComponent<BossBar>();
+            SetField(bar, "grid", grid);
+            SetField(bar, "waves", waves);
+            SetField(bar, "messages", messages);
+            SetField(bar, "root", frame.rectTransform);
+            SetField(bar, "fill", fill.rectTransform);
+            SetField(bar, "label", label);
         }
 
         // The tower selector, used in both views. TowerSelector places the cards and shows the ones

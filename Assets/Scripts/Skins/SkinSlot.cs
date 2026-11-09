@@ -47,5 +47,9 @@ namespace TowerDefense
         SiegeShadow,    // ground shadow under it
         SiegeProjectile,// its heavy shot (pivot: center)
         SiegeBodyPlain, // a bought Siege Cannon: the same, without the gold plate (pivot: feet)
+        BossWalk,       // variants = walk frames of the Colossus (pivot: feet, facing right)
+        BossCharacterShadow, // ground shadow under the Colossus
+        BossBall,       // the Colossus in the Balls style (pivot: feet)
+        BossBallShadow, // contact shadow under its ball
     }
 }

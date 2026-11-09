@@ -35,7 +35,10 @@ namespace TowerDefense.EditorTools
         // Cells of the plan that get a Siege Cannon (empty: everything is the level's first tower).
         private static readonly HashSet<Vector2Int> siegeCells = new HashSet<Vector2Int>();
         private static int maxTowers;
-        private static int towersPlaced, goldSpent, kills;
+        private static int towersPlaced, goldSpent, kills, goldEarned, startGold;
+        // The boss of the run, if any: its last known state, because it is destroyed when it leaks.
+        private static Enemy boss;
+        private static float bossHealth = -1f, bossMaxHealth, bossRemaining, bossSpawnTime, bossEndTime;
         private static float realStart;
         private static GameManager gameManager, previousGameManager;
         private static TowerPlacer placer;
@@ -117,6 +120,7 @@ namespace TowerDefense.EditorTools
 
             Time.timeScale = speed;
             waves.SkipCountdown();
+            TrackBoss();
 
             // Spend gold as soon as possible, following the strategy's ordered list of cells.
             while (towersPlaced < maxTowers && planIndex < plan.Count)
@@ -151,12 +155,18 @@ namespace TowerDefense.EditorTools
                 if (grid != null) grid.SetProjection(projectionOverride.Value);
             }
             siegeCells.Clear();
-            plan = levelIndex == 3 ? BuildGauntletPlan(strategy, out maxTowers)
+            plan = levelIndex == 4 ? BuildCitadelPlan(strategy, out maxTowers)
+                 : levelIndex == 3 ? BuildGauntletPlan(strategy, out maxTowers)
                  : levelIndex == 2 ? BuildFortressPlan(strategy, out maxTowers)
                  : levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers)
                  : BuildPlan(strategy, out maxTowers);
             planIndex = 0;
-            towersPlaced = goldSpent = kills = 0;
+            towersPlaced = goldSpent = kills = goldEarned = 0;
+            startGold = resources.Gold;
+            boss = null;
+            bossHealth = -1f;
+            bossEndTime = 0f;
+            waves.EnemySpawned += NoteBoss;
             killsByWave.Clear();
             Enemy.OnDied += CountKill; // GameManager cleared old subscribers when this level started.
             realStart = Time.realtimeSinceStartup;
@@ -166,9 +176,36 @@ namespace TowerDefense.EditorTools
         private static void CountKill(Enemy enemy)
         {
             kills++;
+            goldEarned += enemy.Data.goldReward;
             int wave = waves.CurrentWaveNumber;
             killsByWave.TryGetValue(wave, out int n);
             killsByWave[wave] = n + 1;
+        }
+
+        private static void NoteBoss(Enemy enemy)
+        {
+            if (!enemy.Data.isBoss) return;
+            boss = enemy;
+            bossSpawnTime = Time.timeSinceLevelLoad;
+            bossMaxHealth = enemy.MaxHealth;
+            bossHealth = enemy.CurrentHealth;
+            bossRemaining = enemy.RemainingDistance;
+            enemy.HealthChanged += (current, max) => bossHealth = current;
+        }
+
+        private static void TrackBoss()
+        {
+            if (boss == null || boss.IsDead) return;
+            bossRemaining = boss.RemainingDistance;
+            bossEndTime = Time.timeSinceLevelLoad;
+        }
+
+        // How the boss did: route cell index (of the last cell, the goal), health left, seconds alive.
+        private static string BossReport(int routeCells)
+        {
+            if (bossHealth < 0f) return "boss none";
+            float index = Mathf.Max(0f, routeCells - 1 - bossRemaining);
+            return $"boss cell {index:F1}/{routeCells - 1} hp {bossHealth:F0}/{bossMaxHealth:F0} seconds {bossEndTime - bossSpawnTime:F1}";
         }
 
         private static string KillsByWave()
@@ -192,7 +229,15 @@ namespace TowerDefense.EditorTools
                 towersPlaced, goldSpent, resources.Gold, kills, Time.timeSinceLevelLoad, Time.realtimeSinceStartup - realStart);
             GridManager endGrid = Object.FindAnyObjectByType<GridManager>();
             List<Vector2Int> endPath = endGrid != null ? new AStarPathfinder(endGrid).FindPath(endGrid.SpawnCell, endGrid.GoalCell) : null;
-            line += $"  path {(endPath != null ? endPath.Count : 0)}  killsByWave {KillsByWave()}";
+            int routeCells = endPath != null ? endPath.Count : 0;
+            line += $"  path {routeCells}  killsByWave {KillsByWave()}";
+            if (levelIndex == 4)
+            {
+                LivesHandler handler = resources.GetComponent<LivesHandler>();
+                string ending = gameManager.State == GameState.Won ? "boss killed"
+                              : handler != null && !string.IsNullOrEmpty(handler.InstantDefeatMessage) ? "boss leaked" : "lives ran out";
+                line += $"  ending {ending.Replace(' ', '_')}  {BossReport(routeCells)}  earned {goldEarned}  start {startGold}";
+            }
             Results.Add(line);
             File.AppendAllText(ResultsPath, line + "\n");
             Debug.Log("[BalanceBot] " + line);
@@ -335,6 +380,87 @@ namespace TowerDefense.EditorTools
             Debug.LogError("[BalanceBot] Unknown strategy: " + name);
             towerLimit = 0;
             return new List<Vector2Int>();
+        }
+
+        // Level 5 "The Citadel": the Level 4 walls, fixed Siege Cannons at (4,7) and (12,7).
+        // A tower's value here is the route cells in its range: the Colossus walks them slowly.
+        private static List<Vector2Int> BuildCitadelPlan(string name, out int towerLimit)
+        {
+            towerLimit = int.MaxValue;
+            switch (name)
+            {
+                case "none":
+                    towerLimit = 0;
+                    return new List<Vector2Int>();
+
+                case "mistake": // Spends everything at once on towers near the spawn and in far corners.
+                {
+                    Vector2Int[] badSiege = { new Vector2Int(0, 0), new Vector2Int(15, 9), new Vector2Int(15, 0), new Vector2Int(0, 9), new Vector2Int(1, 0), new Vector2Int(14, 9) };
+                    siegeCells.UnionWith(badSiege);
+                    var cells = new List<Vector2Int>();
+                    Vector2Int[] badBasic = { new Vector2Int(1, 3), new Vector2Int(1, 7), new Vector2Int(2, 8), new Vector2Int(1, 2), new Vector2Int(2, 1), new Vector2Int(0, 7) };
+                    for (int i = 0; i < badSiege.Length; i++)
+                    {
+                        cells.Add(badSiege[i]);
+                        cells.Add(badBasic[i]);
+                    }
+                    return cells;
+                }
+
+                case "reasonable": // Siege Cannons around the uncovered corridor and the middle, spending all the gold.
+                {
+                    List<Vector2Int> cells = Cells((8, 4), (9, 4), (9, 5), (8, 5), (6, 4), (6, 5), (10, 4),
+                        (8, 2), (9, 2), (6, 2), (5, 4), (5, 5), (8, 6), (9, 6), (10, 2), (5, 3), (10, 6), (5, 2));
+                    siegeCells.UnionWith(cells);
+                    return cells;
+                }
+
+                case "perfect-ish": // Two Basic Towers lengthen the route to 25 cells; then the free cells that
+                                    // cover the most of that route, none on it, so it never changes again.
+                {
+                    Vector2Int[] lengthen = { new Vector2Int(11, 0), new Vector2Int(11, 5) };
+                    var cells = new List<Vector2Int>(lengthen);
+                    List<Vector2Int> best = CellsByRouteCoverage(lengthen);
+                    siegeCells.UnionWith(best);
+                    cells.AddRange(best);
+                    return cells;
+                }
+            }
+            Debug.LogError("[BalanceBot] Unknown strategy: " + name);
+            towerLimit = 0;
+            return new List<Vector2Int>();
+        }
+
+        // Free cells off the route, most route cells within Siege range first, with these cells built on.
+        private static List<Vector2Int> CellsByRouteCoverage(Vector2Int[] occupied)
+        {
+            GridManager grid = Object.FindAnyObjectByType<GridManager>();
+            float range = LevelManager.Instance.AllowedTowers[1].range;
+            foreach (Vector2Int cell in occupied) grid.SetBlockedSilently(cell, true);
+            try
+            {
+                List<Vector2Int> route = new AStarPathfinder(grid).FindPath(grid.SpawnCell, grid.GoalCell);
+                var scored = new List<(int score, Vector2Int cell)>();
+                for (int x = 0; x < grid.Width; x++)
+                    for (int y = 0; y < grid.Height; y++)
+                    {
+                        Vector2Int cell = new Vector2Int(x, y);
+                        if (!grid.IsWalkable(cell) || route.Contains(cell)) continue;
+                        int score = 0;
+                        foreach (Vector2Int step in route)
+                            if ((step - cell).sqrMagnitude <= range * range) score++;
+                        scored.Add((score, cell));
+                    }
+                scored.Sort((a, b) => a.score != b.score ? b.score.CompareTo(a.score)
+                                    : a.cell.x != b.cell.x ? a.cell.x.CompareTo(b.cell.x) : a.cell.y.CompareTo(b.cell.y));
+                var cells = new List<Vector2Int>();
+                foreach (var entry in scored) cells.Add(entry.cell);
+                return cells;
+            }
+            finally
+            {
+                foreach (Vector2Int cell in occupied) grid.SetBlockedSilently(cell, false);
+            }
         }
 
         // Level 4 "The Gauntlet": walls at x=3 y=2..5, x=7 y=4..8, x=11 y=1..4, x=13 y=6,7; fixed Siege Cannons at

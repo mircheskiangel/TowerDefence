@@ -78,6 +78,10 @@ namespace TowerDefense.EditorTools
             SiegeBody("SiegeBodyPlain", goldPlate: false);
             SiegeShadow();
             SiegeProjectile();
+            SaveWalkFrames("BossWalk", Ogre(0, false, true), Ogre(1, false, true), Mathf.RoundToInt(OgrePivotX * BossScale));
+            EllipseShadow("BossShadow", 30, 10);
+            BossBall("BossBall", BossBallRadius);
+            BallShadow("BossBallShadow", BossBallRadius);
         }
 
         // The Siege Cannon: a wide stone plinth with, on a fixed tower only, a gold plate, a
@@ -176,6 +180,9 @@ namespace TowerDefense.EditorTools
 
         public const int WallVariants = 3;
         public const float EliteScale = 1.2f;
+        public const float BossScale = 2f;
+        public const int BossBallRadius = 30; // Tank ball radius 15 x 2.
+        public const int BossBarPixels = 60;
         public const int EliteBallRadius = 18; // Tank ball radius 15 x 1.2.
         public static int TankEliteBarPixels => Mathf.RoundToInt(TankBarPixels * 1.25f);
 
@@ -237,6 +244,21 @@ namespace TowerDefense.EditorTools
             int feetX = r + 4, feetY = size - 2, centerY = feetY - r - 1;
             c.FillEllipse(feetX, centerY, r + 2, r + 2, Rgb(232, 186, 60));
             c.Sphere(feetX, centerY, r, ramp, Rgb(96, 64, 12));
+            SaveSprite(c, name, PivotAt(c, feetX + 0.5f, feetY + 0.5f));
+        }
+
+        // The Colossus in the Balls style: a large turquoise ball with a white rim and a crystal highlight.
+        private static void BossBall(string name, int r)
+        {
+            Color32[] ramp = { Rgb(14, 92, 100), Rgb(24, 146, 150), Rgb(40, 200, 200), Rgb(132, 236, 232) };
+            int size = 2 * r + 8;
+            var c = new PixelCanvas(size, size);
+            int feetX = r + 4, feetY = size - 2, centerY = feetY - r - 1;
+            c.FillEllipse(feetX, centerY, r + 2, r + 2, Rgb(246, 252, 252));
+            c.Sphere(feetX, centerY, r, ramp, Rgb(10, 60, 70));
+            int gx = feetX - r / 3, gy = centerY - r / 3;
+            c.FillPolygonWithEdges(new[] { new Vector2(gx, gy - 9), new Vector2(gx + 5, gy), new Vector2(gx, gy + 7), new Vector2(gx - 5, gy) }, Rgb(200, 245, 250));
+            c.FillPolygonWithEdges(new[] { new Vector2(gx, gy - 6), new Vector2(gx + 2, gy), new Vector2(gx, gy + 3), new Vector2(gx - 2, gy) }, Rgb(255, 255, 255));
             SaveSprite(c, name, PivotAt(c, feetX + 0.5f, feetY + 0.5f));
         }
 
@@ -706,20 +728,27 @@ namespace TowerDefense.EditorTools
 
         // elite: the palette-swapped elite Tank, drawn 1.2x larger: darker purple, dark plates with a
         // gold trim. Geometry is scaled on the pixel grid, so the outline stays 1 px.
-        private static PixelCanvas Ogre(int frame, bool elite = false)
+        // boss: the Colossus, drawn 2x larger in cyan-turquoise, with steel-blue plates and white-cyan
+        // crystal horns and shoulder spikes.
+        private static PixelCanvas Ogre(int frame, bool elite = false, bool boss = false)
         {
-            float k = elite ? EliteScale : 1f;
+            float k = boss ? BossScale : elite ? EliteScale : 1f;
             float S(float v) => v * k;
             int I(float v) => Mathf.RoundToInt(v * k);
-            Color32[] skin = elite
+            Color32[] skin = boss
+                ? new[] { Rgb(14, 92, 100), Rgb(24, 146, 150), Rgb(40, 200, 200), Rgb(66, 214, 212) }
+                : elite
                 ? new[] { Rgb(40, 18, 70), Rgb(72, 36, 112), Rgb(104, 58, 150), Rgb(140, 96, 188) }
                 : new[] { Rgb(64, 32, 104), Rgb(106, 60, 152), Rgb(146, 92, 198), Rgb(190, 146, 238) };
-            Color32[] steel = elite
+            Color32[] steel = boss
+                ? new[] { Rgb(34, 58, 92), Rgb(58, 92, 132), Rgb(92, 132, 176), Rgb(160, 196, 226) }
+                : elite
                 ? new[] { Rgb(38, 38, 48), Rgb(62, 64, 76), Rgb(88, 92, 106), Rgb(120, 124, 138) }
                 : new[] { Rgb(60, 62, 72), Rgb(98, 102, 114), Rgb(140, 146, 158), Rgb(190, 196, 208) };
             Color32[] gold = { Rgb(120, 84, 16), Rgb(176, 128, 30), Rgb(224, 178, 52), Rgb(255, 224, 120) };
             Color32[] wood = { Rgb(70, 44, 26), Rgb(104, 70, 42), Rgb(134, 94, 58), Rgb(160, 118, 78) };
             Color32 boot = Rgb(48, 40, 36), tusk = Rgb(250, 248, 236);
+            if (boss) wood = steel; // The Colossus carries a steel-blue shield.
             var c = new PixelCanvas(I(40), I(44));
             int bob = frame == 1 ? 1 : 0, liftLeft = frame == 0 ? 1 : 0, liftRight = frame == 1 ? 1 : 0;
             // Legs with boots: the lifted one is a pixel shorter.
@@ -747,6 +776,10 @@ namespace TowerDefense.EditorTools
                 c.Put(I(px), I(16) - bob, elite ? gold[3] : steel[3]);
                 c.Put(I(px), I(17) - bob, elite ? gold[2] : steel[2]);
             }
+            // The Colossus's crystal spikes on the shoulders.
+            if (boss)
+                foreach (float spikeX in new[] { 7f, 13f, 27f, 33f })
+                    Crystal(c, S(spikeX), S(17) - bob, S(9f));
             // Head: yellow eyes looking right, brows, mouth and two tusks.
             c.ShadedEllipse(S(20), S(14) - bob, S(6.8f), S(6f), skin);
             c.FillRect(I(16), I(12) - bob, I(18), I(13) - bob, Rgb(255, 230, 120));
@@ -758,8 +791,23 @@ namespace TowerDefense.EditorTools
             c.FillRect(I(17), I(18) - bob, I(23), I(18) - bob, Rgb(50, 20, 60));
             c.FillPolygonWithEdges(new[] { new Vector2(I(17), I(18) - bob), new Vector2(I(16), I(15) - bob), new Vector2(I(18), I(18) - bob) }, tusk);
             c.FillPolygonWithEdges(new[] { new Vector2(I(23), I(18) - bob), new Vector2(I(24), I(15) - bob), new Vector2(I(22), I(18) - bob) }, tusk);
-            c.Outline(Rgb(26, 12, 40));
+            if (boss)
+            {
+                // Crystal horns on the head.
+                Crystal(c, S(15), S(9) - bob, S(8f));
+                Crystal(c, S(25), S(9) - bob, S(8f));
+                Crystal(c, S(20), S(8) - bob, S(6f));
+            }
+            c.Outline(boss ? Rgb(8, 44, 54) : Rgb(26, 12, 40));
             return c;
+        }
+
+        // A white-cyan crystal spike standing on (x, baseY), 'height' pixels tall, lit from the left.
+        private static void Crystal(PixelCanvas c, float x, float baseY, float height)
+        {
+            float w = height * 0.28f;
+            c.FillPolygonWithEdges(new[] { new Vector2(x - w, baseY), new Vector2(x, baseY - height), new Vector2(x + w, baseY) }, Rgb(150, 226, 240));
+            c.FillPolygonWithEdges(new[] { new Vector2(x - w, baseY), new Vector2(x, baseY - height), new Vector2(x, baseY) }, Rgb(240, 253, 255));
         }
 
         // Soft ground shadow with explicit radii, centered on the feet (per enemy type).

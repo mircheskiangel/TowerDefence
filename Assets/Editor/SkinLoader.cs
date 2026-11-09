@@ -64,6 +64,10 @@ namespace TowerDefense.EditorTools
                 skin.siegeShadow = Load(folder, "SiegeShadow", ref count);
                 skin.siegeProjectile = Load(folder, "SiegeProjectile", ref count);
                 skin.siegeBodyPlain = Load(folder, "SiegeBodyPlain", ref count);
+                skin.bossWalk = LoadVariants(folder, "BossWalk", ref count);
+                skin.bossCharacterShadow = Load(folder, "BossShadow", ref count);
+                skin.bossBall = Load(folder, "BossBall", ref count);
+                skin.bossBallShadow = Load(folder, "BossBallShadow", ref count);
                 skin.cliffLeft = Load(folder, "CliffLeft", ref count);
                 skin.cliffRight = Load(folder, "CliffRight", ref count);
                 skin.projectile = Load(folder, "Projectile", ref count);

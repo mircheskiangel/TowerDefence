@@ -14,7 +14,7 @@ namespace TowerDefense
         [Min(0)] public int goldReward = 5;
         public Color color = Color.white;
         [Tooltip("Visual size relative to one cell.")]
-        [Range(0.2f, 1f)] public float scale = 0.5f;
+        [Range(0.2f, 2f)] public float scale = 0.5f;
         [Tooltip("Visual only: SkinSet slot for this enemy in the isometric view.")]
         public SkinSlot skinSlot = SkinSlot.Grunt;
         [Tooltip("Visual only: SkinSet slot of the contact shadow in the isometric view.")]
@@ -38,5 +38,17 @@ namespace TowerDefense
         [Min(0.1f)] public float eliteScale = 1f;
         [Tooltip("Health bar fill width in pixels when skinned; 0 = the normal width.")]
         [Min(0)] public int eliteHealthBarPixels;
+
+        [Header("Boss")]
+        [Tooltip("Shows the large boss bar and its announcement while it is alive.")]
+        public bool isBoss;
+        [Tooltip("Reaching the goal costs all remaining lives, not just one.")]
+        public bool instantDefeatOnLeak;
+        [Tooltip("Shown on the Lost panel after an instant defeat.")]
+        public string defeatMessage = "";
+        [Tooltip("Visual only: seconds of the death fade.")]
+        [Min(0.01f)] public float deathFadeSeconds = 0.25f;
+        [Tooltip("Visual only: top-down head bar width relative to the normal one.")]
+        [Min(0.1f)] public float topDownBarScale = 1f;
     }
 }

@@ -44,6 +44,10 @@ namespace TowerDefense
         public List<FixedTower> fixedTowers = new List<FixedTower>();
         [Tooltip("Limits on bought towers; a type that is not listed has no limit.")]
         public List<TowerLimit> towerLimits = new List<TowerLimit>();
+        [Tooltip("Announced when the last wave starts; empty = nothing.")]
+        public string finalWaveMessage = "";
+        [Tooltip("Title of the victory panel when this level is won; empty = the normal win panel.")]
+        public string victoryTitle = "";
 
         // The most towers of this type the player may have, or 0 if there is no limit.
         public int LimitFor(TowerSO tower)

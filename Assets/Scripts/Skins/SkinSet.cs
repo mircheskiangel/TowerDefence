@@ -54,6 +54,12 @@ namespace TowerDefense
         public Sprite siegeProjectile;
         public Sprite siegeBodyPlain;
 
+        [Header("Boss")]
+        public Sprite[] bossWalk = new Sprite[0];
+        public Sprite bossCharacterShadow;
+        public Sprite bossBall;
+        public Sprite bossBallShadow;
+
         [Header("Permanent walls")]
         public Sprite[] walls = new Sprite[0];
         public Sprite wallShadow;
@@ -120,6 +126,10 @@ namespace TowerDefense
                 case SkinSlot.SiegeShadow: return siegeShadow;
                 case SkinSlot.SiegeProjectile: return siegeProjectile;
                 case SkinSlot.SiegeBodyPlain: return siegeBodyPlain;
+                case SkinSlot.BossWalk: return Pick(bossWalk, variant);
+                case SkinSlot.BossCharacterShadow: return bossCharacterShadow;
+                case SkinSlot.BossBall: return bossBall;
+                case SkinSlot.BossBallShadow: return bossBallShadow;
                 case SkinSlot.HealthBarFrame: return healthBarFrame;
                 case SkinSlot.PortalGlow: return portalGlow;
                 case SkinSlot.Puff: return puff;
@@ -141,6 +151,7 @@ namespace TowerDefense
                 case SkinSlot.GruntWalk: return Count(gruntWalk);
                 case SkinSlot.TankWalk: return Count(tankWalk);
                 case SkinSlot.TankEliteWalk: return Count(tankEliteWalk);
+                case SkinSlot.BossWalk: return Count(bossWalk);
                 case SkinSlot.Wall: return Count(walls);
                 case SkinSlot.Tree: return Count(trees);
                 case SkinSlot.Rock: return Count(rocks);
@@ -170,6 +181,7 @@ namespace TowerDefense
             tankWalk = new Sprite[0];
             gruntCharacterShadow = tankCharacterShadow = null;
             tankEliteWalk = new Sprite[0];
+            bossWalk = new Sprite[0];
             tankEliteCharacterShadow = tankElite = tankEliteShadow = null;
             walls = new Sprite[0];
             wallShadow = iconLock = null;

@@ -31,3 +31,8 @@ MonoBehaviour:
   eliteColor: {r: 0.4, g: 0.18, b: 0.62, a: 1}
   eliteScale: 1.2
   eliteHealthBarPixels: 34
+  isBoss: 0
+  instantDefeatOnLeak: 0
+  defeatMessage: 
+  deathFadeSeconds: 0.25
+  topDownBarScale: 1
