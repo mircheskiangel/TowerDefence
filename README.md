@@ -165,7 +165,7 @@ Path lengths in cells, including start and goal: **Level 1 = 17, Level 2 = 23, L
 | 2 | 15 Grunts every 0.85 s, then (after 2 s) 4 Tanks every 2.5 s, health × 1.3 |
 | 3 | **Tanks only:** 5 Tanks every 2 s, health × 1.5, then (after 3 s) 7 **elite Tanks** every 2 s, health × 2.0 |
 
-**Level 5 "The Citadel"**, the final level: 16 × 10, spawn (0,5), goal (15,4), the same 15 walls as Level 4,
+**Level 5 "The Final Gate"**, the final level: 16 × 10, spawn (0,5), goal (15,4), the same 15 walls as Level 4,
 fixed Siege Cannons at (4,7) and (12,7) (the Level 3 cells), 400 gold, 10 lives. The player may buy Basic Towers
 and **any number of Siege Cannons**, at any time, limited only by gold: it has no `towerLimits` entry, so the
 selector shows no counter.
@@ -679,7 +679,7 @@ put its average below the 3-5 lives target.
 ### Level 5 (isometric, 4x; 6 runs per strategy, 12 for reasonable from iteration 2)
 
 Only Level 5 values were tuned; Levels 1-4, the Siege Cannon stats and the Grunt and Tank base stats are unchanged. Plans
-(`BuildCitadelPlan`): **none** builds nothing; **mistake** spends everything at once on towers near the spawn and in far
+(`BuildFinalGatePlan`): **none** builds nothing; **mistake** spends everything at once on towers near the spawn and in far
 corners; **reasonable** buys Siege Cannons around the uncovered corridor and the middle; **perfect-ish** builds two Basic
 Towers that lengthen the route to 25 cells, then buys the free cells that cover the most route cells.
 

@@ -155,7 +155,7 @@ namespace TowerDefense.EditorTools
                 if (grid != null) grid.SetProjection(projectionOverride.Value);
             }
             siegeCells.Clear();
-            plan = levelIndex == 4 ? BuildCitadelPlan(strategy, out maxTowers)
+            plan = levelIndex == 4 ? BuildFinalGatePlan(strategy, out maxTowers)
                  : levelIndex == 3 ? BuildGauntletPlan(strategy, out maxTowers)
                  : levelIndex == 2 ? BuildFortressPlan(strategy, out maxTowers)
                  : levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers)
@@ -382,9 +382,9 @@ namespace TowerDefense.EditorTools
             return new List<Vector2Int>();
         }
 
-        // Level 5 "The Citadel": the Level 4 walls, fixed Siege Cannons at (4,7) and (12,7).
+        // Level 5 "The Final Gate": the Level 4 walls, fixed Siege Cannons at (4,7) and (12,7).
         // A tower's value here is the route cells in its range: the Colossus walks them slowly.
-        private static List<Vector2Int> BuildCitadelPlan(string name, out int towerLimit)
+        private static List<Vector2Int> BuildFinalGatePlan(string name, out int towerLimit)
         {
             towerLimit = int.MaxValue;
             switch (name)

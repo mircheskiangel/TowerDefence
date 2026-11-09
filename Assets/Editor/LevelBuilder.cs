@@ -79,7 +79,7 @@ namespace TowerDefense.EditorTools
         private const float Level4Wave3TankHealth = 1.5f;
         private const float Level4EliteTankHealth = 2.0f;
 
-        // --- Level 5 "The Citadel" (tuned with BalanceBot; everything else stays as it is) ---
+        // --- Level 5 "The Final Gate" (tuned with BalanceBot; everything else stays as it is) ---
         private const int Level5Gold = 400;
         private const int Level5Lives = 10;
         private const int Level5DecorSeed = 71;
@@ -224,16 +224,16 @@ namespace TowerDefense.EditorTools
             colossus.deathFadeSeconds = 1f;
             colossus.topDownBarScale = 2f;
             EditorUtility.SetDirty(colossus);
-            LevelData citadel = CreateLevel(Level5Path, "The Citadel", GauntletWalls(), Level5Gold, Level5Lives, CreateLevel5Waves(tank, colossus), Level5DecorSeed,
+            LevelData finalGate = CreateLevel(Level5Path, "The Final Gate", GauntletWalls(), Level5Gold, Level5Lives, CreateLevel5Waves(tank, colossus), Level5DecorSeed,
                 new List<TowerSO> { basicTower, siegeCannon },
                 new List<LevelData.FixedTower>
                 {
                     new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(4, 7) },
                     new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(12, 7) },
                 });
-            citadel.finalWaveMessage = "FINAL WAVE";
-            citadel.victoryTitle = "VICTORY!\nYOU DEFEATED THE COLOSSUS";
-            EditorUtility.SetDirty(citadel);
+            finalGate.finalWaveMessage = "FINAL WAVE";
+            finalGate.victoryTitle = "VICTORY!\nYOU DEFEATED THE COLOSSUS";
+            EditorUtility.SetDirty(finalGate);
             AssertLevelsAreValid();
             CreateProjectilePrefab(circle, spriteMaterial, skin); // Before the tower prefab, which references it.
             CreateTowerPrefab(square, circle, towerIso, towerBase, shadow, spriteMaterial, skin);
@@ -740,18 +740,23 @@ namespace TowerDefense.EditorTools
                 ColorBlock colors = button.colors;
                 colors.disabledColor = new Color(0.55f, 0.55f, 0.55f, 1f);
                 button.colors = colors;
-                TextMeshProUGUI label = UiText("Name", image.rectTransform, "", 44, new Color(0.08f, 0.09f, 0.12f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(520f, 90f), centered: true);
+                string levelName = AssetDatabase.LoadAssetAtPath<LevelData>(LevelPaths[i]).levelName;
+                TextMeshProUGUI label = UiText("Name", image.rectTransform, $"{i + 1}.  {levelName}", 44, new Color(0.08f, 0.09f, 0.12f), TextAlignmentOptions.Center, Vector2.zero, new Vector2(520f, 90f), centered: true);
                 Image lockIcon = UiImage("Lock", image.rectTransform, skin.iconLock, Color.white, false);
                 SetRect(lockIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(48f, 60f));
                 TextMeshProUGUI hint = UiText("Hint", frame.rectTransform, $"Win Level {i} to unlock", 30, HudGoldColor, TextAlignmentOptions.Center, new Vector2(0f, y - 63f), new Vector2(700f, 36f), centered: true);
-                lockIcon.gameObject.SetActive(false);
-                hint.gameObject.SetActive(false);
+                // Saved as fresh progress looks; LevelSelectPanel.Refresh applies the real progress.
+                bool locked = i > 0;
+                button.interactable = !locked;
+                label.alpha = locked ? 0.55f : 1f;
+                lockIcon.gameObject.SetActive(locked);
+                hint.gameObject.SetActive(locked);
                 buttons[i] = button;
                 labels[i] = label;
                 locks[i] = lockIcon.gameObject;
                 hints[i] = hint.gameObject;
             }
-            panel.gameObject.SetActive(false);
+            // Saved visible: it is the first screen. LevelSelectPanel hides it when a level is playing.
 
             LevelSelectPanel script = root.gameObject.AddComponent<LevelSelectPanel>();
             SetField(script, "panel", panel.gameObject);
@@ -886,6 +891,8 @@ namespace TowerDefense.EditorTools
             BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin,
                 new[] { labelGo, targetingGo, waveGo, messageGo }, gameOverFrame);
             BuildLevelSelect(canvasGo.transform, skin);
+            // Saved hidden, so the first frame is the level select; IsoHud shows them in a top-down level.
+            foreach (GameObject topDownLabel in new[] { labelGo, targetingGo, waveGo, messageGo }) topDownLabel.SetActive(false);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
@@ -1586,6 +1593,7 @@ namespace TowerDefense.EditorTools
             SetField(bar, "root", frame.rectTransform);
             SetField(bar, "fill", fill.rectTransform);
             SetField(bar, "label", label);
+            frame.gameObject.SetActive(false); // Shown by BossBar while a boss is alive.
         }
 
         // The tower selector, used in both views. TowerSelector places the cards and shows the ones
@@ -1639,6 +1647,7 @@ namespace TowerDefense.EditorTools
             SetField(view, "counterLabel", counter);
             SetField(view, "group", card.gameObject.AddComponent<CanvasGroup>());
             SetField(view, "highlight", highlight);
+            card.gameObject.SetActive(false); // Shown by TowerSelector for the towers a level allows.
             return view;
         }
 
