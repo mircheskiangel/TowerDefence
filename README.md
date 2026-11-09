@@ -138,7 +138,7 @@ timeScale reset and the static state reset apply to it too.
 The builder fails loudly if A\* finds no spawn-to-goal path with a level's walls and fixed towers in place.
 Path lengths in cells, including start and goal: **Level 1 = 17, Level 2 = 23, Level 3 = 21, Level 4 = 23, Level 5 = 23**.
 
-| | Level 1 "The Meadow" | Level 2 "The Snake" | Level 3 "The Fortress" | Level 4 "The Gauntlet" |
+| | Level 1 "The Outer Gate" | Level 2 "The Snake" | Level 3 "The Fortress" | Level 4 "The Gauntlet" |
 |---|---|---|---|---|
 | Grid, spawn, goal | 16 × 10, (0,5), (15,4) | 16 × 10, (0,5), (15,4) | 16 × 10, (0,5), (15,4) | 16 × 10, (0,5), (15,4) |
 | Walls | none | 12 cells: x=4 y=3..6; x=8 y=4..7; x=11 y=1..4 | 16 cells: x=3 y=1,2,3,6,7,8; x=7 y=3..6; x=11 y=1,2,3,6,7,8 | 15 cells: x=3 y=2..5; x=7 y=4..8; x=11 y=1..4; x=13 y=6,7 |

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9cbfda6221d75264aa638108732304ae, type: 3}
   m_Name: Level1
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.LevelData
-  levelName: The Meadow
+  levelName: The Outer Gate
   width: 16
   height: 10
   spawnCell: {x: 0, y: 5}

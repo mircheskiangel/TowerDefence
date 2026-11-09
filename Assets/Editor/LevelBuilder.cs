@@ -198,7 +198,7 @@ namespace TowerDefense.EditorTools
             siegeCannon.topDownScale = 1.15f;
             EditorUtility.SetDirty(siegeCannon);
             var onlyBasic = new List<TowerSO> { basicTower };
-            CreateLevel(Level1Path, "The Meadow", new List<Vector2Int>(), StartGold, StartLives, waves, DecorSeed, onlyBasic, new List<LevelData.FixedTower>());
+            CreateLevel(Level1Path, "The Outer Gate", new List<Vector2Int>(), StartGold, StartLives, waves, DecorSeed, onlyBasic, new List<LevelData.FixedTower>());
             CreateLevel(Level2Path, "The Snake", SnakeWalls(), Level2Gold, Level2Lives, CreateLevel2Waves(grunt, tank), Level2DecorSeed, onlyBasic, new List<LevelData.FixedTower>());
             CreateLevel(Level3Path, "The Fortress", FortressWalls(), Level3Gold, Level3Lives, CreateLevel3Waves(grunt, tank), Level3DecorSeed, onlyBasic,
                 new List<LevelData.FixedTower>
