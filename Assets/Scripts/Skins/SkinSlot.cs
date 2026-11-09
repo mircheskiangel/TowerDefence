@@ -46,5 +46,6 @@ namespace TowerDefense
         SiegeBody,      // the Siege Cannon (pivot: feet)
         SiegeShadow,    // ground shadow under it
         SiegeProjectile,// its heavy shot (pivot: center)
+        SiegeBodyPlain, // a bought Siege Cannon: the same, without the gold plate (pivot: feet)
     }
 }

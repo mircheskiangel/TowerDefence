@@ -6,8 +6,7 @@ namespace TowerDefense
 {
     // Visual only: the isometric HUD in the reference style (dark metal-framed panels).
     // Top row: gold (coin icon), lives (heart icon), "WAVE 1 / 5", and the targeting selector
-    // "TARGET: FIRST" with left/right arrow buttons. Bottom left: the tower card (icon and price).
-    // Bottom centre: one message panel that shows a message (MessageDisplay.Shown, e.g. "Path
+    // "TARGET: FIRST" with left/right arrow buttons. Bottom centre: one message panel that shows a message (MessageDisplay.Shown, e.g. "Path
     // blocked!") for its duration, otherwise the wave countdown.
     // It sits on the always-active Canvas and switches between this HUD and the original top-down
     // labels on every projection change. The panels are used only in isometric AND when the skin
@@ -35,9 +34,6 @@ namespace TowerDefense
         [SerializeField] private TMP_Text waveText;
         [Tooltip("Small subtitle in the wave panel: the level name.")]
         [SerializeField] private TMP_Text levelText;
-        [Tooltip("The tower card: only ever the tower this level lets the player buy.")]
-        [SerializeField] private Image towerIcon;
-        [SerializeField] private TMP_Text towerPrice;
         [SerializeField] private TMP_Text targetText;
         [SerializeField] private Button previousTarget;
         [SerializeField] private Button nextTarget;
@@ -95,12 +91,6 @@ namespace TowerDefense
             RefreshResources();
             RefreshTarget(TargetingSettings.Mode);
             if (levelText != null && LevelManager.Instance != null) levelText.text = LevelManager.Instance.Current.levelName;
-            TowerSO buildTower = LevelManager.Instance != null ? LevelManager.Instance.BuildTower : null;
-            if (buildTower != null)
-            {
-                if (towerIcon != null) towerIcon.sprite = skin.Get(buildTower.bodySlot);
-                if (towerPrice != null) towerPrice.text = buildTower.cost.ToString();
-            }
         }
 
         private void RefreshResources()

@@ -17,11 +17,12 @@ namespace TowerDefense
         [Tooltip("Projectile speed in cells per second.")]
         [Min(0.5f)] public float projectileSpeed = 8f;
         public Color color = Color.white;
-        [Tooltip("Can the player buy this type? A level's allowedTowers can only offer buildable types.")]
-        public bool playerBuildable = true;
 
         [Header("Visual only")]
+        [Tooltip("The body of a bought tower; also its icon and placement preview.")]
         public SkinSlot bodySlot = SkinSlot.TowerBody;
+        [Tooltip("The body when the tower is one of a level's fixed towers.")]
+        public SkinSlot fixedBodySlot = SkinSlot.TowerBody;
         public SkinSlot shadowSlot = SkinSlot.TowerShadow;
         public SkinSlot projectileSlot = SkinSlot.Projectile;
         [Tooltip("Top-down: the projectile's tint.")]

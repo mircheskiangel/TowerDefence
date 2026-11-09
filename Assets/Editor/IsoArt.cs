@@ -74,16 +74,17 @@ namespace TowerDefense.EditorTools
             EliteBall("TankElite", EliteBallRadius);
             BallShadow("TankEliteShadow", EliteBallRadius);
             IconLock();
-            SiegeBody();
+            SiegeBody("SiegeBody", goldPlate: true);
+            SiegeBody("SiegeBodyPlain", goldPlate: false);
             SiegeShadow();
             SiegeProjectile();
         }
 
-        // The Siege Cannon: a wide stone plinth with a gold plate (it marks the tower as fixed), a
+        // The Siege Cannon: a wide stone plinth with, on a fixed tower only, a gold plate, a
         // taller dark stone body with a dark red banner, a battlement and a large cannon. Left face
         // lighter, right face darker, like the Basic tower. Pivot at the feet. The ground shadow is
         // separate, so the fire kick never scales it.
-        private static void SiegeBody()
+        private static void SiegeBody(string spriteName, bool goldPlate)
         {
             var c = new PixelCanvas(TileW, 80);
             int x = 32, y = 68;
@@ -108,7 +109,7 @@ namespace TowerDefense.EditorTools
             c.FillPolygonWithEdges(Pts(x, y, -pw, -pH, 0, ph - pH, pw, -pH, 0, -ph - pH), Rgb(170, 166, 156));
 
             // Gold plate on the plinth's left face, near the front corner.
-            for (int dy = 0; dy < 5; dy++)
+            for (int dy = 0; goldPlate && dy < 5; dy++)
                 for (int dx = 0; dx < 9; dx++)
                 {
                     int yy = (int)(y + ph * (1f - (10 - dx) / (float)pw)) - 3 - dy;
@@ -152,7 +153,7 @@ namespace TowerDefense.EditorTools
             Merlon(c, x - w + 1, by - H);
             Merlon(c, x + w - 5, by - H);
             Merlon(c, x - 2, by + h - H - 1);
-            SaveSprite(c, "SiegeBody", PivotAt(c, x, y));
+            SaveSprite(c, spriteName, PivotAt(c, x, y));
         }
 
         // Larger and darker than the Basic tower's shadow, because the tower is taller and wider.

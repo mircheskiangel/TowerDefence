@@ -28,7 +28,8 @@ namespace TowerDefense.EditorTools
         private const string Level1Path = LevelsFolder + "/Level1.asset";
         private const string Level2Path = LevelsFolder + "/Level2.asset";
         private const string Level3Path = LevelsFolder + "/Level3.asset";
-        private static readonly string[] LevelPaths = { Level1Path, Level2Path, Level3Path };
+        private const string Level4Path = LevelsFolder + "/Level4.asset";
+        private static readonly string[] LevelPaths = { Level1Path, Level2Path, Level3Path, Level4Path };
         private const string PrefabsFolder = GeneratedFolder + "/Prefabs";
         private const string EnemyPrefabPath = PrefabsFolder + "/Enemy.prefab";
         private const string TowerPrefabPath = PrefabsFolder + "/Tower.prefab";
@@ -67,6 +68,18 @@ namespace TowerDefense.EditorTools
         private const int Level3DecorSeed = 37;
         private const float Level3Wave2TankHealth = 1.3f;
         private const float Level3EliteTankHealth = 2.2f;
+
+        // --- Level 4 "The Gauntlet" (tuned with BalanceBot; everything else stays as it is) ---
+        private const int Level4Gold = 225;
+        private const int Level4Lives = 10;
+        private const int Level4DecorSeed = 53;
+        private const int Level4SiegeLimit = 2;
+        private const float Level4Wave2TankHealth = 1.3f;
+        private const float Level4Wave3TankHealth = 1.5f;
+        private const float Level4EliteTankHealth = 2.0f;
+
+        // The most tower cards a level can show (one per allowed tower).
+        private const int MaxTowerCards = 2;
 
         // --- Colors ---
         private static readonly Color BackgroundColor = new Color(0.08f, 0.09f, 0.12f);
@@ -161,10 +174,10 @@ namespace TowerDefense.EditorTools
                 projectileSpeed: 8f, BasicTowerColor);
             basicTower.projectileColor = ProjectileColor;
             // The Siege Cannon's stats are fixed by design: damage 50, range 4.5, 3 s between shots.
-            TowerSO siegeCannon = CreateTowerData("Siege Cannon", cost: 0, range: 4.5f, damage: 50f, fireRate: 1f / 3f,
+            TowerSO siegeCannon = CreateTowerData("Siege Cannon", cost: 50, range: 4.5f, damage: 50f, fireRate: 1f / 3f,
                 projectileSpeed: 6f, new Color(0.34f, 0.20f, 0.24f));
-            siegeCannon.playerBuildable = false;
-            siegeCannon.bodySlot = SkinSlot.SiegeBody;
+            siegeCannon.bodySlot = SkinSlot.SiegeBodyPlain;
+            siegeCannon.fixedBodySlot = SkinSlot.SiegeBody;
             siegeCannon.shadowSlot = SkinSlot.SiegeShadow;
             siegeCannon.projectileSlot = SkinSlot.SiegeProjectile;
             siegeCannon.projectileColor = new Color(0.30f, 0.20f, 0.20f);
@@ -182,6 +195,14 @@ namespace TowerDefense.EditorTools
                     new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(4, 7) },
                     new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(12, 7) },
                 });
+            CreateLevel(Level4Path, "The Gauntlet", GauntletWalls(), Level4Gold, Level4Lives, CreateLevel4Waves(grunt, tank), Level4DecorSeed,
+                new List<TowerSO> { basicTower, siegeCannon },
+                new List<LevelData.FixedTower>
+                {
+                    new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(1, 8) },
+                    new LevelData.FixedTower { tower = siegeCannon, cell = new Vector2Int(13, 8) },
+                },
+                new List<LevelData.TowerLimit> { new LevelData.TowerLimit { tower = siegeCannon, maxCount = Level4SiegeLimit } });
             AssertLevelsAreValid();
             CreateProjectilePrefab(circle, spriteMaterial, skin); // Before the tower prefab, which references it.
             CreateTowerPrefab(square, circle, towerIso, towerBase, shadow, spriteMaterial, skin);
@@ -196,6 +217,7 @@ namespace TowerDefense.EditorTools
             LevelData level1 = AssetDatabase.LoadAssetAtPath<LevelData>(Level1Path);
             LevelData level2 = AssetDatabase.LoadAssetAtPath<LevelData>(Level2Path);
             LevelData level3 = AssetDatabase.LoadAssetAtPath<LevelData>(Level3Path);
+            LevelData level4 = AssetDatabase.LoadAssetAtPath<LevelData>(Level4Path);
             grid.Configure(level1.width, level1.height, CellSize, Vector2.zero, level1.spawnCell, level1.goalCell, startProjection);
             BoardView board = BuildBoard(grid, square, diamond, wallSquare, spriteMaterial, skin, level1);
 
@@ -216,9 +238,10 @@ namespace TowerDefense.EditorTools
             WaveManager waveManager = BuildWaveManager(grid, resources, enemyPrefab, waves);
             GameManager gameManager = BuildGameManager(resources, waveManager);
             SetField(waveManager, "gameManager", gameManager);
-            MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin, basicTower);
+            MessageDisplay messages = BuildUI(resources, waveManager, gameManager, grid, skin);
             TowerPlacer placer = BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
-            BuildLevelManager(new[] { level1, level2, level3 }, grid, resources, waveManager, placer, board, gameManager);
+            BuildTowerSelector(messages.transform.parent, grid, resources, placer, skin);
+            BuildLevelManager(new[] { level1, level2, level3, level4 }, grid, resources, waveManager, placer, board, gameManager);
             BuildAStarOverlay(grid, pathView, messages, square, diamond, spriteMaterial);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
@@ -336,7 +359,7 @@ namespace TowerDefense.EditorTools
 
         // Creates the LevelData asset, or updates it in place (same GUID) if it already exists.
         private static LevelData CreateLevel(string path, string levelName, List<Vector2Int> walls, int gold, int lives, List<WaveSO> waves, int decorSeed,
-            List<TowerSO> allowedTowers, List<LevelData.FixedTower> fixedTowers)
+            List<TowerSO> allowedTowers, List<LevelData.FixedTower> fixedTowers, List<LevelData.TowerLimit> towerLimits = null)
         {
             LevelData level = AssetDatabase.LoadAssetAtPath<LevelData>(path);
             if (level == null)
@@ -356,6 +379,7 @@ namespace TowerDefense.EditorTools
             level.decorationSeed = decorSeed;
             level.allowedTowers = new List<TowerSO>(allowedTowers);
             level.fixedTowers = fixedTowers;
+            level.towerLimits = towerLimits ?? new List<LevelData.TowerLimit>();
             EditorUtility.SetDirty(level);
             return level;
         }
@@ -378,6 +402,28 @@ namespace TowerDefense.EditorTools
             for (int y = 3; y <= 6; y++) walls.Add(new Vector2Int(7, y));
             foreach (int y in new[] { 1, 2, 3, 6, 7, 8 }) walls.Add(new Vector2Int(11, y));
             return walls;
+        }
+
+        // Level 4: 15 wall cells in four short lines; fixed Siege Cannons cover the start and the end.
+        private static List<Vector2Int> GauntletWalls()
+        {
+            var walls = new List<Vector2Int>();
+            for (int y = 2; y <= 5; y++) walls.Add(new Vector2Int(3, y));
+            for (int y = 4; y <= 8; y++) walls.Add(new Vector2Int(7, y));
+            for (int y = 1; y <= 4; y++) walls.Add(new Vector2Int(11, y));
+            for (int y = 6; y <= 7; y++) walls.Add(new Vector2Int(13, y));
+            return walls;
+        }
+
+        // Level 4: 3 waves; the third has only Tanks, which is what the Siege Cannons are for.
+        private static List<WaveSO> CreateLevel4Waves(EnemySO grunt, EnemySO tank)
+        {
+            return new List<WaveSO>
+            {
+                CreateWave("Level4Wave1", Group(grunt, 11, 0.95f), Group(tank, 2, 3.0f, delayBefore: 2f)),
+                CreateWave("Level4Wave2", Group(grunt, 15, 0.85f), Group(tank, 4, 2.5f, delayBefore: 2f, healthMultiplier: Level4Wave2TankHealth)),
+                CreateWave("Level4Wave3", Group(tank, 5, 2.0f, healthMultiplier: Level4Wave3TankHealth), Group(tank, 7, 2.0f, delayBefore: 3f, healthMultiplier: Level4EliteTankHealth, elite: true)),
+            };
         }
 
         // Level 3: 3 waves, each bigger and harder than the Level 2 equivalent.
@@ -425,8 +471,13 @@ namespace TowerDefense.EditorTools
                     if (level.allowedTowers.Count == 0)
                         throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': no tower to buy.");
                     foreach (TowerSO tower in level.allowedTowers)
-                        if (tower == null || !tower.playerBuildable)
-                            throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': allows a tower the player cannot buy.");
+                        if (tower == null)
+                            throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': an allowed tower is missing.");
+                    if (level.allowedTowers.Count > MaxTowerCards)
+                        throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': more allowed towers than tower cards.");
+                    foreach (LevelData.TowerLimit limit in level.towerLimits)
+                        if (limit.maxCount < 1 || !level.allowedTowers.Contains(limit.tower))
+                            throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': bad tower limit.");
                     List<Vector2Int> route = new AStarPathfinder(grid).FindPath(level.spawnCell, level.goalCell);
                     if (route == null)
                         throw new System.InvalidOperationException($"[LevelBuilder] Level '{level.levelName}': A* finds NO path from {level.spawnCell} to {level.goalCell}.");
@@ -627,8 +678,8 @@ namespace TowerDefense.EditorTools
             dim.raycastTarget = true; // Blocks clicks from reaching the grid behind it.
 
             Image frame = UiImage("Frame", panel, skin.hudPanel, Color.white, true);
-            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 700f));
-            TextMeshProUGUI title = UiText("Title", frame.rectTransform, "SELECT LEVEL", 60, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 265f), new Vector2(760f, 90f), centered: true);
+            SetRect(frame.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860f, 850f));
+            TextMeshProUGUI title = UiText("Title", frame.rectTransform, "SELECT LEVEL", 60, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 345f), new Vector2(760f, 90f), centered: true);
             title.raycastTarget = false;
 
             int count = LevelPaths.Length;
@@ -636,7 +687,7 @@ namespace TowerDefense.EditorTools
             Object[] labels = new Object[count], locks = new Object[count], hints = new Object[count];
             for (int i = 0; i < count; i++)
             {
-                float y = 135f - i * 155f;
+                float y = 215f - i * 155f;
                 Image image = UiImage($"Level{i + 1}", frame.rectTransform, skin.hudButton, Color.white, true);
                 image.raycastTarget = true;
                 SetRect(image.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(700f, 110f));
@@ -694,7 +745,7 @@ namespace TowerDefense.EditorTools
         // Screen-space canvas with the HUD label, plus an EventSystem that uses the
         // new Input System (needed so TowerPlacer can ignore clicks on UI).
         private static MessageDisplay BuildUI(PlayerResources resources, WaveManager waveManager, GameManager gameManager,
-            GridManager grid, SkinSet skin, TowerSO towerData)
+            GridManager grid, SkinSet skin)
         {
             GameObject canvasGo = new GameObject("Canvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();
@@ -788,7 +839,7 @@ namespace TowerDefense.EditorTools
             SetField(messages, "label", messageLabel);
 
             GameObject gameOverFrame = BuildGameOverPanel(canvasGo.transform, gameManager, resources, waveManager, grid, skin);
-            BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin, towerData,
+            BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin,
                 new[] { labelGo, targetingGo, waveGo, messageGo }, gameOverFrame);
             BuildLevelSelect(canvasGo.transform, skin);
 
@@ -1411,9 +1462,9 @@ namespace TowerDefense.EditorTools
 
         // The isometric HUD (dark metal panels with icons), shown by IsoHud instead of the
         // original labels in isometric. Top row like the original layout: gold and lives left,
-        // wave centre, targeting selector right; tower card bottom left; message panel bottom centre.
+        // wave centre, targeting selector right; message panel bottom centre.
         private static void BuildIsoHud(GameObject canvasGo, PlayerResources resources, WaveManager waveManager, GameManager gameManager,
-            MessageDisplay messages, GridManager grid, SkinSet skin, TowerSO towerData, GameObject[] topDownLabels, GameObject gameOverFrame)
+            MessageDisplay messages, GridManager grid, SkinSet skin, GameObject[] topDownLabels, GameObject gameOverFrame)
         {
             RectTransform root = UiRect("IsoHUD", canvasGo.transform);
             StretchFull(root);
@@ -1441,14 +1492,6 @@ namespace TowerDefense.EditorTools
             Button next = UiArrowButton("Next", target, skin, new Vector2(1f, 0.5f), new Vector2(-8f, 0f), true);
             TextMeshProUGUI targetText = UiText("Value", target, "TARGET: FIRST", 30, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(340f, 56f), centered: true);
 
-            // Tower card, bottom left: tower icon (from the tower skin) and its price.
-            RectTransform card = UiPanel("TowerCard", root, skin, new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(262f, 128f));
-            Image towerIcon = UiImage("TowerIcon", card, skin.towerBody, Color.white, false);
-            towerIcon.preserveAspect = true;
-            SetRect(towerIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(128f, 104f));
-            UiIcon("Coin", card, skin.iconCoin, new Vector2(162f, 0f), 36f);
-            TextMeshProUGUI towerPrice = UiText("Price", card, towerData != null ? towerData.cost.ToString() : "?", 38, HudGoldColor, TextAlignmentOptions.Left, new Vector2(204f, 0f), new Vector2(54f, 56f));
-
             // Message / countdown panel, bottom centre (faded in and out by IsoHud).
             RectTransform bottom = UiPanel("MessagePanel", root, skin, new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(820f, 64f));
             CanvasGroup bottomGroup = bottom.gameObject.AddComponent<CanvasGroup>();
@@ -1472,13 +1515,65 @@ namespace TowerDefense.EditorTools
             SetField(hud, "livesText", livesText);
             SetField(hud, "waveText", waveText);
             SetField(hud, "levelText", levelText);
-            SetField(hud, "towerIcon", towerIcon);
-            SetField(hud, "towerPrice", towerPrice);
             SetField(hud, "targetText", targetText);
             SetField(hud, "previousTarget", previous);
             SetField(hud, "nextTarget", next);
             SetField(hud, "bottomPanel", bottomGroup);
             SetField(hud, "bottomText", bottomText);
+        }
+
+        // The tower selector, used in both views. TowerSelector places the cards and shows the ones
+        // the level needs; a card starts with the layout of a single card.
+        private static void BuildTowerSelector(Transform canvas, GridManager grid, PlayerResources resources, TowerPlacer placer, SkinSet skin)
+        {
+            RectTransform root = UiRect("TowerSelector", canvas);
+            StretchFull(root);
+            root.SetAsFirstSibling(); // Under the Game Over overlay and the level select screen.
+
+            Object[] cards = new Object[MaxTowerCards];
+            for (int i = 0; i < MaxTowerCards; i++)
+                cards[i] = BuildTowerCard($"TowerCard{i + 1}", root, skin);
+
+            TowerSelector selector = root.gameObject.AddComponent<TowerSelector>();
+            SetField(selector, "grid", grid);
+            SetField(selector, "resources", resources);
+            SetField(selector, "placer", placer);
+            SetField(selector, "skin", skin);
+            SetArray(selector, "cards", cards);
+        }
+
+        private static TowerCardView BuildTowerCard(string name, RectTransform parent, SkinSet skin)
+        {
+            RectTransform card = UiPanel(name, parent, skin, new Vector2(0f, 0f), new Vector2(20f, 16f), new Vector2(262f, 128f));
+            Image panel = card.GetComponent<Image>();
+            panel.raycastTarget = true; // Clickable; TowerPlacer ignores clicks over UI.
+            Button button = card.gameObject.AddComponent<Button>();
+            button.targetGraphic = panel;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            Outline highlight = card.gameObject.AddComponent<Outline>();
+            highlight.effectColor = HudGoldColor;
+            highlight.effectDistance = new Vector2(5f, -5f);
+            highlight.enabled = false;
+
+            Image icon = UiImage("TowerIcon", card, skin.towerBody, Color.white, false);
+            icon.preserveAspect = true;
+            SetRect(icon.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 4f), new Vector2(128f, 104f));
+            UiIcon("Coin", card, skin.iconCoin, new Vector2(162f, 0f), 36f);
+            TextMeshProUGUI price = UiText("Price", card, "", 38, HudGoldColor, TextAlignmentOptions.Left, new Vector2(204f, 0f), new Vector2(54f, 56f));
+            TextMeshProUGUI nameLabel = UiText("Name", card, "", 25, HudTextColor, TextAlignmentOptions.Left, new Vector2(146f, 26f), new Vector2(190f, 36f));
+            TextMeshProUGUI counter = UiText("Counter", card, "", 28, HudTextColor, TextAlignmentOptions.Right, new Vector2(246f, -22f), new Vector2(82f, 40f));
+
+            TowerCardView view = card.gameObject.AddComponent<TowerCardView>();
+            SetField(view, "rect", card);
+            SetField(view, "button", button);
+            SetField(view, "icon", icon);
+            SetField(view, "coin", card.Find("Coin"));
+            SetField(view, "priceLabel", price);
+            SetField(view, "nameLabel", nameLabel);
+            SetField(view, "counterLabel", counter);
+            SetField(view, "group", card.gameObject.AddComponent<CanvasGroup>());
+            SetField(view, "highlight", highlight);
+            return view;
         }
 
         private static RectTransform UiRect(string name, Transform parent)

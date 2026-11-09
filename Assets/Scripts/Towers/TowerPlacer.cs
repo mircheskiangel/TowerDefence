@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -43,10 +44,60 @@ namespace TowerDefense
         private Vector2Int? cachedCell;
         private bool cachedKeepsPathOpen;
 
-        // The tower type this level lets the player buy. Called by LevelManager before Start.
-        public void SetBuildTower(TowerSO tower)
+        private IReadOnlyList<TowerSO> allowedTowers;
+
+        // What the selected tower or the set of towers changed to; the selector redraws.
+        public event Action SelectionChanged;
+        public event Action TowersChanged;
+
+        public TowerSO SelectedTower => towerData;
+
+        // The tower types this level lets the player buy, the first one selected. This object is
+        // rebuilt with the scene, so every level load starts on it. Called by LevelManager before Start.
+        public void SetAllowedTowers(IReadOnlyList<TowerSO> towers)
         {
-            towerData = tower;
+            allowedTowers = towers;
+            if (towers != null && towers.Count > 0) towerData = towers[0];
+        }
+
+        // Only a tower the level allows can ever be selected.
+        public bool SelectTower(TowerSO tower)
+        {
+            if (tower == null || allowedTowers == null) return false;
+            for (int i = 0; i < allowedTowers.Count; i++)
+            {
+                if (allowedTowers[i] != tower) continue;
+                towerData = tower;
+                SelectionChanged?.Invoke();
+                return true;
+            }
+            return false;
+        }
+
+        // The limit of this type on the current level, or 0 if it has none.
+        public int LimitOf(TowerSO tower)
+        {
+            return LevelManager.Instance != null ? LevelManager.Instance.Current.LimitFor(tower) : 0;
+        }
+
+        // Live towers of this type that the player bought (fixed towers are the level's own).
+        public int CountLive(TowerSO tower)
+        {
+            int count = 0;
+            foreach (Tower placed in towers.Values)
+                if (placed != null && placed.Data == tower && !placed.IsFixed) count++;
+            return count;
+        }
+
+        public bool IsLimitReached(TowerSO tower)
+        {
+            int limit = LimitOf(tower);
+            return limit > 0 && CountLive(tower) >= limit;
+        }
+
+        private void ShowLimitMessage()
+        {
+            messages.Show($"Limit reached: {LimitOf(towerData)} {towerData.displayName}s");
         }
 
         // The fixed towers of the level: free, on their permanent cells (the grid has them already,
@@ -123,7 +174,7 @@ namespace TowerDefense
             bool free = IsFreeCell(cell);
             bool affordable = resources.CanAfford(towerData.cost);
             bool keepsPathOpen = free && HoverKeepsPathOpen(cell);
-            bool valid = free && affordable && keepsPathOpen;
+            bool valid = free && affordable && keepsPathOpen && !IsLimitReached(towerData);
 
             highlight.enabled = true;
             highlight.transform.position = grid.CellToWorld(cell);
@@ -155,7 +206,9 @@ namespace TowerDefense
         // can be tested without a real mouse.
         public void ClickCell(Vector2Int cell)
         {
-            if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
+            if (IsFreeCell(cell) && IsLimitReached(towerData))
+                ShowLimitMessage();
+            else if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
                 TryPlaceTower(cell);
             else if (towers.TryGetValue(cell, out Tower tower) && tower != null && tower.IsFixed)
                 messages.Show("This tower is fixed");
@@ -243,7 +296,13 @@ namespace TowerDefense
         public bool TryPlaceTower(Vector2Int cell)
         {
             if (gameManager != null && !gameManager.IsPlaying) return false;
-            if (!IsFreeCell(cell) || !resources.CanAfford(towerData.cost)) return false;
+            if (!IsFreeCell(cell)) return false;
+            if (IsLimitReached(towerData))
+            {
+                ShowLimitMessage();
+                return false;
+            }
+            if (!resources.CanAfford(towerData.cost)) return false;
             if (!SimulatePlacement(cell))
             {
                 messages.Show("Path blocked!");
@@ -257,6 +316,7 @@ namespace TowerDefense
 
             // The real change: raises GridChanged -> every enemy and the path view re-path.
             grid.SetBlocked(cell, true);
+            TowersChanged?.Invoke();
 
             // Visual only (isometric skin): a tiny dust puff around the new tower's feet.
             Sprite puff = skin != null && grid.ProjectionType == GridProjectionType.Isometric ? skin.Get(SkinSlot.Puff) : null;

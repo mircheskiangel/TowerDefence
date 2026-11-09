@@ -32,6 +32,8 @@ namespace TowerDefense.EditorTools
         private static string strategy;
         private static List<Vector2Int> plan;
         private static int planIndex;
+        // Cells of the plan that get a Siege Cannon (empty: everything is the level's first tower).
+        private static readonly HashSet<Vector2Int> siegeCells = new HashSet<Vector2Int>();
         private static int maxTowers;
         private static int towersPlaced, goldSpent, kills;
         private static float realStart;
@@ -44,7 +46,7 @@ namespace TowerDefense.EditorTools
         public static readonly List<string> Results = new List<string>();
 
         // projection: draw the board with this projection in every run (null = as the scene is built).
-        // level: index of the level to play (0 = Level 1, 1 = Level 2).
+        // level: index of the level to play (0 = Level 1 ... 3 = Level 4).
         public static void StartBatch(string strategies, int repeats, float timeScale = 4f, GridProjectionType? projection = null, int level = 0)
         {
             if (!EditorApplication.isPlaying) { Debug.LogError("[BalanceBot] Enter Play mode first."); return; }
@@ -117,9 +119,13 @@ namespace TowerDefense.EditorTools
             waves.SkipCountdown();
 
             // Spend gold as soon as possible, following the strategy's ordered list of cells.
-            while (towersPlaced < maxTowers && planIndex < plan.Count && resources.Gold >= placer.TowerCost)
+            while (towersPlaced < maxTowers && planIndex < plan.Count)
             {
-                Vector2Int cell = plan[planIndex++];
+                Vector2Int cell = plan[planIndex];
+                if (siegeCells.Count > 0)
+                    placer.SelectTower(LevelManager.Instance.AllowedTowers[siegeCells.Contains(cell) ? 1 : 0]);
+                if (resources.Gold < placer.TowerCost) break;
+                planIndex++;
                 int cost = placer.TowerCost;
                 if (placer.TryPlaceTower(cell))
                 {
@@ -144,7 +150,9 @@ namespace TowerDefense.EditorTools
                 GridManager grid = Object.FindAnyObjectByType<GridManager>();
                 if (grid != null) grid.SetProjection(projectionOverride.Value);
             }
-            plan = levelIndex == 2 ? BuildFortressPlan(strategy, out maxTowers)
+            siegeCells.Clear();
+            plan = levelIndex == 3 ? BuildGauntletPlan(strategy, out maxTowers)
+                 : levelIndex == 2 ? BuildFortressPlan(strategy, out maxTowers)
                  : levelIndex == 1 ? BuildSnakePlan(strategy, out maxTowers)
                  : BuildPlan(strategy, out maxTowers);
             planIndex = 0;
@@ -327,6 +335,80 @@ namespace TowerDefense.EditorTools
             Debug.LogError("[BalanceBot] Unknown strategy: " + name);
             towerLimit = 0;
             return new List<Vector2Int>();
+        }
+
+        // Level 4 "The Gauntlet": walls at x=3 y=2..5, x=7 y=4..8, x=11 y=1..4, x=13 y=6,7; fixed Siege Cannons at
+        // (1,8) and (13,8). Siege Cannons are bought first; "nosiege" is "reasonable" with Basic Towers
+        // only, to show what the purchased cannons add.
+        private static List<Vector2Int> BuildGauntletPlan(string name, out int towerLimit)
+        {
+            towerLimit = int.MaxValue;
+            Vector2Int[] goodSpots = { new Vector2Int(9, 7), new Vector2Int(10, 1) };
+            Vector2Int[] badSpots = { new Vector2Int(0, 0), new Vector2Int(1, 0) };
+            switch (name)
+            {
+                case "none":
+                    towerLimit = 0;
+                    return new List<Vector2Int>();
+
+                case "weak": // Siege Cannons out of reach of the route, then 4 Basic Towers in one clump.
+                {
+                    towerLimit = 6;
+                    GridManager grid = Object.FindAnyObjectByType<GridManager>();
+                    List<Vector2Int> path = new AStarPathfinder(grid).FindPath(grid.SpawnCell, grid.GoalCell);
+                    Vector2Int middle = path[path.Count / 2];
+                    List<Vector2Int> clump = CellsBesidePath();
+                    clump.Sort((a, b) => (a - middle).sqrMagnitude.CompareTo((b - middle).sqrMagnitude));
+                    return WithSiege(badSpots, clump);
+                }
+
+                case "reasonable": // The two Siege spots that complete the fixed cannons' cover, then Basic Towers beside the route.
+                    return WithSiege(goodSpots, CellsBesidePathAround(goodSpots));
+
+                case "nosiege":
+                    return CellsBesidePath();
+
+                case "maze": // Like "reasonable", then one tower closes the third wall's top crossing and two its
+                             // lower gate. The route then uses the bottom gap of the second wall: 2 cells more
+                             // (without the top tower it would leave for the far north side, away from every tower).
+                {
+                    var beside = new List<Vector2Int>();
+                    foreach (Vector2Int cell in CellsBesidePathAround(goodSpots))
+                        if (cell.x < 10 || cell.x > 12 || cell.y < 5 || cell.y > 8) beside.Add(cell);
+                    List<Vector2Int> cells = beside.GetRange(0, Mathf.Min(MazeTowersBeforeDetour, beside.Count));
+                    cells.AddRange(Cells((11, 0), (11, 5), (11, 6)));
+                    cells.AddRange(beside);
+                    return WithSiege(goodSpots, cells);
+                }
+            }
+            Debug.LogError("[BalanceBot] Unknown strategy: " + name);
+            towerLimit = 0;
+            return new List<Vector2Int>();
+        }
+
+        private const int MazeTowersBeforeDetour = 10;
+
+        private static List<Vector2Int> WithSiege(Vector2Int[] spots, List<Vector2Int> basicCells)
+        {
+            var cells = new List<Vector2Int>(spots);
+            siegeCells.UnionWith(spots);
+            cells.AddRange(basicCells);
+            return cells;
+        }
+
+        // The cells beside the route as it will be once these cells are built on.
+        private static List<Vector2Int> CellsBesidePathAround(Vector2Int[] occupied)
+        {
+            GridManager grid = Object.FindAnyObjectByType<GridManager>();
+            foreach (Vector2Int cell in occupied) grid.SetBlockedSilently(cell, true);
+            try
+            {
+                return CellsBesidePath();
+            }
+            finally
+            {
+                foreach (Vector2Int cell in occupied) grid.SetBlockedSilently(cell, false);
+            }
         }
 
         // Free cells next to the spawn -> goal path: first beside every second path cell from the

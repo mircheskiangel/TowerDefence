@@ -8,7 +8,8 @@ namespace TowerDefense
     // It fires a projectile at that target whenever its cooldown (1 / fireRate) is over.
     // Range checks use grid coordinates (the tower's Cell vs. Enemy.GridPosition), never world distances.
     // One prefab for every type: stats and look come from TowerSO. A fixed tower only differs by what
-    // the level does with it (see LevelData.fixedTowers) and a small gold mark in top-down.
+    // the level does with it (see LevelData.fixedTowers) and its gold mark: part of its sprite in
+    // isometric (TowerSO.fixedBodySlot), a small dot in top-down. A bought tower has neither.
     public class Tower : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer body;
@@ -53,7 +54,7 @@ namespace TowerDefense
             if (look != null)
             {
                 look.SetTint(data.color); // Top-down tint; a skinned sprite is drawn untinted.
-                look.SetIsometricSlot(data.bodySlot);
+                look.SetIsometricSlot(isFixed ? data.fixedBodySlot : data.bodySlot);
             }
             if (shadowSkin != null) shadowSkin.SetSlot(data.shadowSlot);
             transform.localScale *= data.topDownScale; // A skinned sprite cancels this: native pixel size.

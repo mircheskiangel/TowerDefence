@@ -19,8 +19,8 @@ MonoBehaviour:
   fireRate: 1.5
   projectileSpeed: 8
   color: {r: 0.3, g: 0.75, b: 0.95, a: 1}
-  playerBuildable: 1
   bodySlot: 5
+  fixedBodySlot: 5
   shadowSlot: 7
   projectileSlot: 15
   projectileColor: {r: 1, g: 0.92, b: 0.25, a: 1}

@@ -52,6 +52,7 @@ namespace TowerDefense
         public Sprite siegeBody;
         public Sprite siegeShadow;
         public Sprite siegeProjectile;
+        public Sprite siegeBodyPlain;
 
         [Header("Permanent walls")]
         public Sprite[] walls = new Sprite[0];
@@ -118,6 +119,7 @@ namespace TowerDefense
                 case SkinSlot.SiegeBody: return siegeBody;
                 case SkinSlot.SiegeShadow: return siegeShadow;
                 case SkinSlot.SiegeProjectile: return siegeProjectile;
+                case SkinSlot.SiegeBodyPlain: return siegeBodyPlain;
                 case SkinSlot.HealthBarFrame: return healthBarFrame;
                 case SkinSlot.PortalGlow: return portalGlow;
                 case SkinSlot.Puff: return puff;

@@ -13,14 +13,14 @@ MonoBehaviour:
   m_Name: SiegeCannon
   m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.TowerSO
   displayName: Siege Cannon
-  cost: 0
+  cost: 50
   range: 4.5
   damage: 50
   fireRate: 0.33333334
   projectileSpeed: 6
   color: {r: 0.34, g: 0.2, b: 0.24, a: 1}
-  playerBuildable: 0
-  bodySlot: 39
+  bodySlot: 42
+  fixedBodySlot: 39
   shadowSlot: 40
   projectileSlot: 41
   projectileColor: {r: 0.3, g: 0.2, b: 0.2, a: 1}
