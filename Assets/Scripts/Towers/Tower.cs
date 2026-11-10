@@ -12,6 +12,15 @@ namespace TowerDefense
     // isometric (TowerSO.fixedBodySlot), a small dot in top-down. A bought tower has neither.
     public class Tower : MonoBehaviour
     {
+        // Raised after a tower fires a projectile (audio listens; gameplay does not).
+        public static event System.Action<Tower> Fired;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticEvents()
+        {
+            Fired = null;
+        }
+
         [SerializeField] private SpriteRenderer body;
         [SerializeField] private ProjectionLook look;   // Visual: flat square / standing tower.
         [SerializeField] private DepthSorter depth;     // Visual: isometric draw order.
@@ -148,6 +157,7 @@ namespace TowerDefense
 
             KickTarget.localScale = baseScale * Data.fireKickScale; // Visual only.
             kickTimeLeft = fireKickDuration;
+            Fired?.Invoke(this);
         }
 
         // Collects enemies within range (manual squared-distance check against the registry)

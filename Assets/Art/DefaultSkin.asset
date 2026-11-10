@@ -100,6 +100,7 @@ MonoBehaviour:
   iconHeart: {fileID: 21300000, guid: 49b6402c580e9ca4d86308f02c43328f, type: 3}
   iconArrow: {fileID: 21300000, guid: a9484e151b3b7684db186475d7d43395, type: 3}
   iconLock: {fileID: 21300000, guid: 73bff1fc4bef522419b2cf283f9a8e8a, type: 3}
+  iconSpeaker: {fileID: 21300000, guid: 8aee375fe8034d3498baade86824249c, type: 3}
   healthBarFrame: {fileID: 21300000, guid: 9610a59e8089c604ba224f66adec555d, type: 3}
   portalGlow: {fileID: 21300000, guid: 2e32ab7a5360c4144ab278ff44a0db78, type: 3}
   puff: {fileID: 21300000, guid: 8669eb0cdc23ab94cb026868b572877c, type: 3}

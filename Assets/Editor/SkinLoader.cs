@@ -60,6 +60,7 @@ namespace TowerDefense.EditorTools
                 skin.walls = LoadVariants(folder, "Wall", ref count);
                 skin.wallShadow = Load(folder, "WallShadow", ref count);
                 skin.iconLock = Load(folder, "IconLock", ref count);
+                skin.iconSpeaker = Load(folder, "IconSpeaker", ref count);
                 skin.siegeBody = Load(folder, "SiegeBody", ref count);
                 skin.siegeShadow = Load(folder, "SiegeShadow", ref count);
                 skin.siegeProjectile = Load(folder, "SiegeProjectile", ref count);

@@ -152,6 +152,8 @@ namespace TowerDefense.EditorTools
             EnsureFolder(ArtFolder);
 
             // 1. Assets
+            AudioSynth.GenerateAll(); // Assets/Audio/Generated/*.wav, synthesized in code.
+            AudioLibrary audioLibrary = CreateAudioLibrary();
             SkinSet skin = CreateSkin();
             Sprite square = CreateSprite("Square", SpriteShape.Square);
             Sprite circle = CreateSprite("Circle", SpriteShape.Circle);
@@ -178,6 +180,7 @@ namespace TowerDefense.EditorTools
             tank.eliteColor = new Color(0.40f, 0.18f, 0.62f);
             tank.eliteScale = IsoArt.EliteScale;
             tank.eliteHealthBarPixels = IsoArt.TankEliteBarPixels;
+            tank.hitSound = SfxId.HitTank;
             EditorUtility.SetDirty(tank);
             CreateEnemyPrefab(circle, square, enemyIso, shadow, spriteMaterial, skin);
             List<WaveSO> waves = CreateWaves(grunt, tank);
@@ -191,6 +194,7 @@ namespace TowerDefense.EditorTools
             siegeCannon.fixedBodySlot = SkinSlot.SiegeBody;
             siegeCannon.shadowSlot = SkinSlot.SiegeShadow;
             siegeCannon.projectileSlot = SkinSlot.SiegeProjectile;
+            siegeCannon.fireSound = SfxId.ShootSiege;
             siegeCannon.projectileColor = new Color(0.30f, 0.20f, 0.20f);
             siegeCannon.projectileScale = 1.6f;
             siegeCannon.projectileTrail = true;
@@ -223,6 +227,8 @@ namespace TowerDefense.EditorTools
             colossus.defeatMessage = "The Colossus reached the goal!";
             colossus.deathFadeSeconds = 1f;
             colossus.topDownBarScale = 2f;
+            colossus.hitSound = SfxId.HitBoss;
+            colossus.deathSound = SfxId.DeathBoss;
             EditorUtility.SetDirty(colossus);
             LevelData finalGate = CreateLevel(Level5Path, "The Final Gate", GauntletWalls(), Level5Gold, Level5Lives, CreateLevel5Waves(tank, colossus), Level5DecorSeed,
                 new List<TowerSO> { basicTower, siegeCannon },
@@ -280,6 +286,8 @@ namespace TowerDefense.EditorTools
             ProjectionSwitcher switcher = new GameObject("ProjectionSwitcher").AddComponent<ProjectionSwitcher>();
             SetField(switcher, "grid", grid);
             new GameObject("EnemySkinSwitcher").AddComponent<EnemySkinSwitcher>();
+            AudioManager audioManager = new GameObject("AudioManager").AddComponent<AudioManager>();
+            SetField(audioManager, "library", AssetDatabase.LoadAssetAtPath<AudioLibrary>(AudioLibraryPath));
 
             // 8. Save and register in Build Settings
             EditorSceneManager.MarkSceneDirty(scene);
@@ -891,6 +899,7 @@ namespace TowerDefense.EditorTools
             BuildIsoHud(canvasGo, resources, waveManager, gameManager, messages, grid, skin,
                 new[] { labelGo, targetingGo, waveGo, messageGo }, gameOverFrame);
             BuildLevelSelect(canvasGo.transform, skin);
+            BuildAudioUI(canvasGo.transform, skin); // Last: above the level select and the end panels.
             // Saved hidden, so the first frame is the level select; IsoHud shows them in a top-down level.
             foreach (GameObject topDownLabel in new[] { labelGo, targetingGo, waveGo, messageGo }) topDownLabel.SetActive(false);
 
@@ -1571,6 +1580,134 @@ namespace TowerDefense.EditorTools
             SetField(hud, "nextTarget", next);
             SetField(hud, "bottomPanel", bottomGroup);
             SetField(hud, "bottomText", bottomText);
+        }
+
+        // --- Audio ---
+        private const string AudioLibraryPath = DataFolder + "/AudioLibrary.asset";
+        // File names of the effects, in SfxId order, and each one's base volume.
+        private static readonly string[] SfxFiles = { "sfx_shoot_basic", "sfx_shoot_siege", "sfx_hit_grunt", "sfx_hit_tank", "sfx_hit_boss",
+            "sfx_death", "sfx_death_boss", "sfx_ui_click", "sfx_place_tower", "sfx_blocked", "sfx_life_lost", "sfx_wave_start", "sfx_boss_approach" };
+        private static readonly float[] SfxVolumes = { 0.45f, 0.8f, 0.5f, 0.6f, 0.8f, 0.6f, 1f, 0.6f, 0.8f, 0.7f, 0.9f, 0.8f, 1f };
+
+        private static AudioClip Clip(string name)
+        {
+            AudioClip clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{AudioSynth.Folder}/{name}.wav");
+            if (clip == null) Debug.LogError("[LevelBuilder] Missing audio clip " + name);
+            return clip;
+        }
+
+        // The AudioLibrary asset: every generated clip by its id, so gameplay never names a clip.
+        private static AudioLibrary CreateAudioLibrary()
+        {
+            if (SfxFiles.Length != (int)SfxId.Count || SfxVolumes.Length != (int)SfxId.Count)
+                throw new System.InvalidOperationException("[LevelBuilder] The audio tables do not match SfxId.");
+            AudioLibrary library = AssetDatabase.LoadAssetAtPath<AudioLibrary>(AudioLibraryPath);
+            if (library == null)
+            {
+                library = ScriptableObject.CreateInstance<AudioLibrary>();
+                AssetDatabase.CreateAsset(library, AudioLibraryPath);
+            }
+            library.sfx = new AudioClip[SfxFiles.Length];
+            for (int i = 0; i < SfxFiles.Length; i++) library.sfx[i] = Clip(SfxFiles[i]);
+            library.sfxVolume = (float[])SfxVolumes.Clone();
+            library.menuMusic = Clip("music_menu");
+            library.gameMusic = Clip("music_game");
+            library.bossMusic = Clip("music_boss");
+            library.winJingle = Clip("jingle_win");
+            library.loseJingle = Clip("jingle_lose");
+            EditorUtility.SetDirty(library);
+            return library;
+        }
+
+        // The audio settings: a speaker button and a panel with three sliders and a mute toggle, in the
+        // isometric HUD style in both views.
+        private static void BuildAudioUI(Transform canvas, SkinSet skin)
+        {
+            RectTransform root = UiRect("AudioUI", canvas);
+            StretchFull(root);
+
+            Image speakerImage = UiImage("SpeakerButton", root, skin.hudButton, HudArrowButtonColor, true);
+            speakerImage.raycastTarget = true;
+            SetRect(speakerImage.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-20f, -20f), new Vector2(64f, 64f));
+            Button speaker = speakerImage.gameObject.AddComponent<Button>();
+            speaker.targetGraphic = speakerImage;
+            speaker.navigation = new Navigation { mode = Navigation.Mode.None };
+            Image icon = UiImage("Icon", speakerImage.rectTransform, skin.iconSpeaker, Color.white, false);
+            SetRect(icon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40f, 36f));
+
+            RectTransform panel = UiPanel("Panel", root, skin, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600f, 440f));
+            panel.GetComponent<Image>().raycastTarget = true; // Clicks on the panel never reach the grid.
+            UiText("Title", panel, "AUDIO", 44, HudTextColor, TextAlignmentOptions.Center, new Vector2(0f, 168f), new Vector2(400f, 60f), centered: true);
+            Slider master = AudioRow(panel, "MASTER", 80f);
+            Slider music = AudioRow(panel, "MUSIC", 10f);
+            Slider sfx = AudioRow(panel, "SFX", -60f);
+            UiText("MuteLabel", panel, "MUTE  (M)", 30, HudTextColor, TextAlignmentOptions.Left, new Vector2(-150f, -140f), new Vector2(220f, 44f), centered: true);
+            Toggle mute = UiToggle(panel, new Vector2(-10f, -140f));
+
+            Image closeImage = UiImage("CloseButton", panel, skin.hudButton, HudArrowButtonColor, true);
+            closeImage.raycastTarget = true;
+            SetRect(closeImage.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(52f, 52f));
+            Button close = closeImage.gameObject.AddComponent<Button>();
+            close.targetGraphic = closeImage;
+            close.navigation = new Navigation { mode = Navigation.Mode.None };
+            UiText("X", closeImage.rectTransform, "X", 30, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(52f, 52f), centered: true);
+            panel.gameObject.SetActive(false);
+
+            AudioSettingsPanel script = root.gameObject.AddComponent<AudioSettingsPanel>();
+            SetField(script, "panel", panel.gameObject);
+            SetField(script, "openButton", speaker);
+            SetField(script, "closeButton", close);
+            SetField(script, "masterSlider", master);
+            SetField(script, "musicSlider", music);
+            SetField(script, "sfxSlider", sfx);
+            SetField(script, "muteToggle", mute);
+        }
+
+        private static Slider AudioRow(RectTransform panel, string label, float y)
+        {
+            UiText(label + "Label", panel, label, 30, HudTextColor, TextAlignmentOptions.Left, new Vector2(-180f, y), new Vector2(160f, 44f), centered: true);
+            RectTransform root = UiRect(label + "Slider", panel);
+            SetRect(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(70f, y), new Vector2(340f, 30f));
+            Image background = UiImage("Background", root, null, new Color(0.10f, 0.11f, 0.14f), false);
+            StretchFull(background.rectTransform);
+            background.raycastTarget = true;
+            RectTransform fillArea = UiRect("Fill Area", root);
+            StretchFull(fillArea);
+            fillArea.offsetMin = new Vector2(4f, 4f);
+            fillArea.offsetMax = new Vector2(-4f, -4f);
+            Image fill = UiImage("Fill", fillArea, null, HudGoldColor, false);
+            fill.rectTransform.sizeDelta = Vector2.zero;
+            RectTransform handleArea = UiRect("Handle Slide Area", root);
+            StretchFull(handleArea);
+            handleArea.offsetMin = new Vector2(10f, 0f);
+            handleArea.offsetMax = new Vector2(-10f, 0f);
+            Image handle = UiImage("Handle", handleArea, null, HudTextColor, false);
+            handle.raycastTarget = true;
+            handle.rectTransform.sizeDelta = new Vector2(20f, 12f);
+            Slider slider = root.gameObject.AddComponent<Slider>();
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handle.rectTransform;
+            slider.targetGraphic = handle;
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.navigation = new Navigation { mode = Navigation.Mode.None };
+            return slider;
+        }
+
+        private static Toggle UiToggle(RectTransform panel, Vector2 position)
+        {
+            Image box = UiImage("MuteToggle", panel, null, HudArrowButtonColor, false);
+            box.raycastTarget = true;
+            SetRect(box.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position, new Vector2(44f, 44f));
+            Image check = UiImage("Checkmark", box.rectTransform, null, HudGoldColor, false);
+            SetRect(check.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(28f, 28f));
+            Toggle toggle = box.gameObject.AddComponent<Toggle>();
+            toggle.targetGraphic = box;
+            toggle.graphic = check;
+            toggle.isOn = false;
+            toggle.navigation = new Navigation { mode = Navigation.Mode.None };
+            return toggle;
         }
 
         // The large boss bar, used in both views; BossBar shows it while a boss is alive.

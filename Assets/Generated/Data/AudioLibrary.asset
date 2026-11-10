@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77ec29e105a21d5469fe86f0dbdbbf43, type: 3}
+  m_Name: AudioLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::TowerDefense.AudioLibrary
+  sfx:
+  - {fileID: 8300000, guid: 284727ca7378aa84088de566ad529b0a, type: 3}
+  - {fileID: 8300000, guid: 0d71390c16855574aa311bff58c2f8cd, type: 3}
+  - {fileID: 8300000, guid: f764e954abd6d834a8da73ee7fa7243e, type: 3}
+  - {fileID: 8300000, guid: e162f254799fc1c4cac75f57f24318b4, type: 3}
+  - {fileID: 8300000, guid: d4dfc7242fd81dc43ba93a7dfe3de41d, type: 3}
+  - {fileID: 8300000, guid: 2468da7ea9bda5f45b7ec9e5374f10f1, type: 3}
+  - {fileID: 8300000, guid: 018328ee1c6e5b64fb3597f12d293e2b, type: 3}
+  - {fileID: 8300000, guid: dc29208ac74ab5c4382bbf7fc1ca4e74, type: 3}
+  - {fileID: 8300000, guid: 48c961043c66fd647b6161a18f21215b, type: 3}
+  - {fileID: 8300000, guid: a30975545c9738440bda426894461e7d, type: 3}
+  - {fileID: 8300000, guid: 98dec8162201078479eb3c77ce27b585, type: 3}
+  - {fileID: 8300000, guid: 357427267ef5bec4e9c3f3360e709a74, type: 3}
+  - {fileID: 8300000, guid: 0b62ce530d5dff94cb9dbf8a983e5566, type: 3}
+  sfxVolume:
+  - 0.45
+  - 0.8
+  - 0.5
+  - 0.6
+  - 0.8
+  - 0.6
+  - 1
+  - 0.6
+  - 0.8
+  - 0.7
+  - 0.9
+  - 0.8
+  - 1
+  menuMusic: {fileID: 8300000, guid: 6a543a4992b8dcc45a4aa266799bbba2, type: 3}
+  gameMusic: {fileID: 8300000, guid: 8139abc0a3a872a4fb334c55883b2561, type: 3}
+  bossMusic: {fileID: 8300000, guid: 23ff1a8bf0df5634fa30c726d4077605, type: 3}
+  winJingle: {fileID: 8300000, guid: cc3b48f7a283d1140a422203036079d7, type: 3}
+  loseJingle: {fileID: 8300000, guid: 56c526b373323114f969463774d9680d, type: 3}

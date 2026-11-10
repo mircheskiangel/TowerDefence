@@ -25,6 +25,8 @@ namespace TowerDefense
         public SkinSlot fixedBodySlot = SkinSlot.TowerBody;
         public SkinSlot shadowSlot = SkinSlot.TowerShadow;
         public SkinSlot projectileSlot = SkinSlot.Projectile;
+        [Tooltip("Audio only: the sound of a shot.")]
+        public SfxId fireSound = SfxId.ShootBasic;
         [Tooltip("Top-down: the projectile's tint.")]
         public Color projectileColor = new Color(1.00f, 0.92f, 0.25f);
         [Tooltip("Top-down: the projectile's size relative to the normal one.")]

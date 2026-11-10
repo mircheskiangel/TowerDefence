@@ -49,6 +49,14 @@ namespace TowerDefense
         // What the selected tower or the set of towers changed to; the selector redraws.
         public event Action SelectionChanged;
         public event Action TowersChanged;
+        // A click or placement that could not build (any reason, with or without a message). Audio listens.
+        public event Action PlacementRejected;
+
+        private void Reject(string message)
+        {
+            if (message != null) messages.Show(message);
+            PlacementRejected?.Invoke();
+        }
 
         public TowerSO SelectedTower => towerData;
 
@@ -97,7 +105,7 @@ namespace TowerDefense
 
         private void ShowLimitMessage()
         {
-            messages.Show($"Limit reached: {LimitOf(towerData)} {towerData.displayName}s");
+            Reject($"Limit reached: {LimitOf(towerData)} {towerData.displayName}s");
         }
 
         // The fixed towers of the level: free, on their permanent cells (the grid has them already,
@@ -211,11 +219,13 @@ namespace TowerDefense
             else if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
                 TryPlaceTower(cell);
             else if (towers.TryGetValue(cell, out Tower tower) && tower != null && tower.IsFixed)
-                messages.Show("This tower is fixed");
+                Reject("This tower is fixed");
             else if (grid.IsPermanent(cell))
-                messages.Show("Cannot build on a wall");
+                Reject("Cannot build on a wall");
             else if (grid.IsBlocked(cell))
-                messages.Show("A tower is already here");
+                Reject("A tower is already here");
+            else
+                Reject(null); // Not enough gold, or the spawn / goal cell: no message, as before.
         }
 
         private bool TryGetHoveredCell(Mouse mouse, out Vector2Int cell)
@@ -305,7 +315,7 @@ namespace TowerDefense
             if (!resources.CanAfford(towerData.cost)) return false;
             if (!SimulatePlacement(cell))
             {
-                messages.Show("Path blocked!");
+                Reject("Path blocked!");
                 return false;
             }
             if (!resources.TrySpend(towerData.cost)) return false;

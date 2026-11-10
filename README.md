@@ -57,6 +57,8 @@ so references stay valid). All balance numbers are set in `LevelBuilder.cs`.
 | **P** | Show / hide the debug line of the current A\* path from spawn to goal |
 | **O** | Show / hide the cells the last spawn-to-goal A\* search expanded, with the expanded count and path length in the message panel |
 | **V** | Switch the view: isometric (default) ↔ top-down |
+| **M** | Mute / unmute all sound (works everywhere) |
+| **Speaker button** (top right) | Opens the audio panel: Master, Music and Sfx volume and Mute |
 | **K** | Switch the enemy skin in the isometric view: characters (default) ↔ balls. Visual only; affects live and future enemies |
 | **T** | Cycle the targeting mode of **all** towers: First → Closest → Strongest → Weakest |
 | **◀ / ▶** buttons (isometric HUD, top right) | Previous / next targeting mode |
@@ -267,9 +269,10 @@ All runtime code is in `Assets/Scripts/` under the namespace `TowerDefense`.
 | `Towers/Targeting` | `TargetingMode`, `ITargetSelector`, `TargetSelectors` (the four strategies), `TargetingSettings` (global mode), `TargetingModeSwitcher` (T key) |
 | `Waves` | `WaveManager` (countdowns, spawning coroutine, wave-cleared check) |
 | `UI` | `ResourcesHUD`, `TargetingHUD`, `WaveHUD`, `MessageDisplay`, `GameOverPanel`, `LevelSelectPanel`, `IsoHud` (isometric panels) |
+| `Audio` | `AudioManager` (persistent sound player, music state machine, settings), `AudioLibrary` (generated clip table), `AudioSettingsPanel` (speaker button and panel), `SfxId` / `MusicId` / `JingleId` |
 | `Skins` | `SkinSet` (sprite slots), `SkinSlot`, `SkinnedSprite` (one renderer or image taking its sprite from a slot) |
 | `Data` | ScriptableObjects: `LevelData`, `EnemySO`, `TowerSO`, `WaveSO` |
-| `Assets/Editor` | `LevelBuilder` (builds the level), `PixelArt`, `IsoArt`, `SkinLoader` (generated art and skin), `BalanceBot` (automated balance tests, editor-only) |
+| `Assets/Editor` | `LevelBuilder` (builds the level), `PixelArt`, `IsoArt`, `SkinLoader` (generated art and skin), `AudioSynth` (generated audio), `BalanceBot` (automated balance tests, editor-only) |
 
 The systems talk to each other mostly through **C# events**, so no class needs to poll another:
 
@@ -432,6 +435,54 @@ a dust puff when a tower is placed, and a slight bob of the walking balls.
 The `Reference/` (art reference) and `Screenshots/` folders are git-ignored.
 
 ---
+
+## Audio
+
+All sound is **synthesized in code**, like the pixel art: `Assets/Editor/AudioSynth.cs` builds every clip from
+sine / square / triangle / saw oscillators, seeded noise, ADSR envelopes, exponential pitch sweeps, one-pole
+low-pass and high-pass filters and a feedback echo, then a soft limiter (tanh) and normalization so nothing
+clips (sound effects peak at -3 dBFS, music and jingles at -9 dBFS). Each clip has a fixed seed and no
+`UnityEngine.Random` is used, so **Build Level** writes byte-identical WAV files. They are 16-bit mono WAVs in
+`Assets/Audio/Generated/`, about 5.5 MB in total, with import settings set by the generator: effects 44.1 kHz,
+Decompress On Load, PCM; music and jingles 22.05 kHz, Compressed In Memory, Vorbis, Load In Background.
+
+Music loops are rendered into a buffer of exactly N bars: notes and echoes that run past the end wrap around to
+the start, and the filters run twice around the loop, so the loop point has no click (the jump between the last
+and first sample is 0.001-0.005, against sample steps of up to 0.08-0.37 inside the music).
+
+| Clip | Length | Used for |
+|---|---|---|
+| `sfx_shoot_basic` | 0.12 s | A Basic Tower fires (light pluck) |
+| `sfx_shoot_siege` | 0.5 s | A Siege Cannon fires, fixed or bought (low thump and noise tail) |
+| `sfx_hit_grunt` / `sfx_hit_tank` / `sfx_hit_boss` | 0.1 / 0.15 / 0.25 s | A projectile hits a Grunt / a Tank or elite / the Colossus |
+| `sfx_death` / `sfx_death_boss` | 0.25 / 1.5 s | An enemy dies / the Colossus dies (rumble and rising crystal shatter) |
+| `sfx_life_lost` | 0.6 s | An enemy reaches the goal |
+| `sfx_place_tower` / `sfx_blocked` | 0.2 / 0.3 s | A tower is placed / a click cannot build ("Path blocked!", a wall, a tower, the limit, no gold) |
+| `sfx_ui_click` | 0.05 s | Any UI button |
+| `sfx_wave_start` / `sfx_boss_approach` | 0.8 / 2 s | A wave starts / "THE COLOSSUS APPROACHES" |
+| `music_menu` | 30 s loop | Level select (A minor pentatonic pads and arpeggio, 64 bpm) |
+| `music_game` | 40 s loop | Every level (D dorian, 96 bpm, drums, bass, pad, lead; 8 bars and a variation) |
+| `music_boss` | 30 s loop | Level 5 from the moment the Colossus spawns (E phrygian, 128 bpm) |
+| `jingle_win` / `jingle_lose` | 6 / 4.5 s | A level is won / lost |
+
+**AudioManager.** One persistent object (the scene's copy after a reload destroys itself; its static state is
+reset in `SubsystemRegistration`, so Domain Reload off is safe). It only listens to events: `Tower.Fired`,
+`Projectile.HitEnemy` (raised once per projectile), `Enemy.OnDied`, `Enemy.OnReachedGoal`,
+`WaveManager.WaveStarted` and `EnemySpawned`, `GameManager.StateChanged`, `TowerPlacer.TowersChanged` and
+`PlacementRejected`, and every UI button. Which sound a tower or an enemy makes is data (`TowerSO.fireSound`,
+`EnemySO.hitSound` and `deathSound`); clips live in the generated `AudioLibrary` asset, so no gameplay script
+names a clip. Effects play on a pool of 16 sources with at most 12 at a time, the same effect is not restarted
+within 0.04 s, pitch varies by ±6% and volume by ±10% (with its own random generator, so gameplay randomness is
+untouched), and tower and enemy sounds are panned by their screen position (±0.4). Nothing allocates per frame.
+
+**Music state machine.** Menu music on the level select, game music in a level, boss music from the moment the
+Colossus spawns. Changes crossfade over 1 s on two sources. On a win or a loss the music fades out in 0.3 s and the
+jingle plays once; nothing interrupts it until the player restarts or returns to the menu, which stops it and
+starts the right music. Music fades follow real time, so game speed never changes the music.
+
+**Volume.** Master 0.8, Music 0.5 and Sfx 0.8 by default, plus Mute, saved in PlayerPrefs. The speaker button
+(top right on the level select, under the targeting selector in a level) opens the panel in both views; the sfx
+slider plays a click on release. **M** mutes everywhere. The camera holds the only AudioListener.
 
 ## AI techniques used
 
@@ -706,6 +757,7 @@ be held: 250 gold buys about 5 cannons against 6,000 HP of Tanks in wave 1.
   though it is better on average.
 - The bots are simple fixed build orders, not optimal players.
 - Five levels, two tower types, two enemy types and one boss.
+- The audio was verified with data (event counts, levels, loop seams, music logs), not by listening.
 - Movement is 4-directional only, and there are no flying enemies (everything walks on the grid).
 
 ---

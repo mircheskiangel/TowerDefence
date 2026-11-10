@@ -27,6 +27,9 @@ namespace TowerDefense
         [Min(0.01f)] public float walkFrameSeconds = 0.18f;
         [Tooltip("Visual only: health bar fill width in pixels when skinned (isometric).")]
         [Min(4)] public int healthBarPixels = 18;
+        [Tooltip("Audio only: played when a projectile hits it and when it dies.")]
+        public SfxId hitSound = SfxId.HitGrunt;
+        public SfxId deathSound = SfxId.Death;
 
         [Header("Elite look (visual only; empty slots keep the normal look)")]
         public SkinSlot eliteSkinSlot = SkinSlot.None;

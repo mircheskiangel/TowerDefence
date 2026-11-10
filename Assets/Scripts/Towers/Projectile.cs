@@ -9,6 +9,15 @@ namespace TowerDefense
     // the transform is only placed through GridManager's projection.
     public class Projectile : MonoBehaviour
     {
+        // Raised once when a projectile damages its (still living) target. Audio listens.
+        public static event System.Action<Enemy> HitEnemy;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticEvents()
+        {
+            HitEnemy = null;
+        }
+
         [Tooltip("Flight speed in cells per second.")]
         [SerializeField] private float speed = 8f;
         [SerializeField] private float hitDistance = 0.1f;
@@ -80,7 +89,14 @@ namespace TowerDefense
 
             if ((gridPosition - lastKnownPosition).sqrMagnitude <= hitDistance * hitDistance)
             {
-                if (target != null) target.TakeDamage(damage); // Only a still-living target is hit.
+                if (target != null) // Only a still-living target is hit.
+                {
+                    Enemy hit = target;
+                    target = null; // Never twice, even if Destroy is delayed to the end of the frame.
+                    hit.TakeDamage(damage);
+                    HitEnemy?.Invoke(hit);
+                }
+                initialized = false;
                 Destroy(gameObject);
             }
         }

@@ -24,6 +24,8 @@ MonoBehaviour:
   characterShadowSlot: 30
   walkFrameSeconds: 0.18
   healthBarPixels: 18
+  hitSound: 2
+  deathSound: 5
   eliteSkinSlot: 0
   eliteSkinShadowSlot: 0
   eliteWalkSlot: 0

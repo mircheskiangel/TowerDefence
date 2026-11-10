@@ -74,6 +74,7 @@ namespace TowerDefense.EditorTools
             EliteBall("TankElite", EliteBallRadius);
             BallShadow("TankEliteShadow", EliteBallRadius);
             IconLock();
+            IconSpeaker();
             SiegeBody("SiegeBody", goldPlate: true);
             SiegeBody("SiegeBodyPlain", goldPlate: false);
             SiegeShadow();
@@ -233,6 +234,23 @@ namespace TowerDefense.EditorTools
             c.FillRect(7, 12, 8, 15, Rgb(30, 18, 10));
             c.Outline(Rgb(20, 14, 14));
             SaveSprite(c, "IconLock", new Vector2(0.5f, 0.5f));
+        }
+
+        // The audio settings button: a speaker with two sound waves.
+        private static void IconSpeaker()
+        {
+            Color32 light = Rgb(232, 230, 220), mid = Rgb(176, 180, 190), dark = Rgb(20, 14, 14);
+            var c = new PixelCanvas(20, 18);
+            c.FillRect(2, 6, 5, 11, mid);
+            c.FillPolygonWithEdges(new[] { new Vector2(5, 6), new Vector2(10, 1), new Vector2(10, 16), new Vector2(5, 11) }, light);
+            c.Outline(dark);
+            foreach (var (x, y0, y1) in new[] { (13, 6, 11), (16, 3, 14) })
+            {
+                c.FillRect(x, y0 + 1, x, y1 - 1, light);
+                c.Put(x - 1, y0, light);
+                c.Put(x - 1, y1, light);
+            }
+            SaveSprite(c, "IconSpeaker", new Vector2(0.5f, 0.5f));
         }
 
         // The Tank's ball for the elite (Balls style): larger, darker, with a golden rim.

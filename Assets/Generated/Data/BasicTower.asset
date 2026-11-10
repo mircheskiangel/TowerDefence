@@ -23,6 +23,7 @@ MonoBehaviour:
   fixedBodySlot: 5
   shadowSlot: 7
   projectileSlot: 15
+  fireSound: 0
   projectileColor: {r: 1, g: 0.92, b: 0.25, a: 1}
   projectileScale: 1
   projectileTrail: 0

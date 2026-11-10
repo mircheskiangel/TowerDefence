@@ -76,6 +76,7 @@ namespace TowerDefense
         public Sprite iconHeart;
         public Sprite iconArrow;
         public Sprite iconLock;
+        public Sprite iconSpeaker;
 
         [Header("Effects")]
         public Sprite healthBarFrame;
@@ -184,7 +185,7 @@ namespace TowerDefense
             bossWalk = new Sprite[0];
             tankEliteCharacterShadow = tankElite = tankEliteShadow = null;
             walls = new Sprite[0];
-            wallShadow = iconLock = null;
+            wallShadow = iconLock = iconSpeaker = null;
             siegeBody = siegeShadow = siegeProjectile = null;
             trees = new Sprite[0];
             rocks = new Sprite[0];
