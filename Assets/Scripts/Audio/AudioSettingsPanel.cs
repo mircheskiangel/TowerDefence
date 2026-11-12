@@ -22,6 +22,9 @@ namespace TowerDefense
 
         private AudioManager Audio => AudioManager.Instance;
 
+        // Other input (the targeting arrow keys) is ignored while the panel is open.
+        public bool IsOpen => panel != null && panel.activeSelf;
+
         private void Awake()
         {
             if (panel != null) panel.SetActive(false);

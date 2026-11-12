@@ -280,6 +280,7 @@ namespace TowerDefense.EditorTools
             TowerPlacer placer = BuildTowerPlacer(grid, resources, towerPrefab, basicTower, square, diamond, diamondOutline, ring, spriteMaterial, messages, gameManager, skin);
             BuildTowerSelector(messages.transform.parent, grid, resources, placer, skin);
             BuildBossBar(messages.transform.parent, grid, waveManager, messages, skin);
+            BuildTowerInfoCard(messages.transform.parent, grid, placer, gameManager, messages, skin);
             BuildLevelManager(new[] { level1, level2, level3, level4, level5 }, grid, resources, waveManager, placer, board, gameManager);
             BuildAStarOverlay(grid, pathView, messages, square, diamond, spriteMaterial);
             new GameObject("TargetingModeSwitcher").AddComponent<TargetingModeSwitcher>();
@@ -631,6 +632,20 @@ namespace TowerDefense.EditorTools
             SetField(placer, "skin", skin);
             SetField(placer, "puffMaterial", material);
             SetField(placer, "rangeIndicator", indicator);
+
+            // The selected tower's range: a second indicator, gold, that stays while the cursor moves.
+            GameObject selection = CreateSpriteObject("SelectionRange", ring, material, SelectionRangeColor, OrderRange);
+            selection.transform.SetParent(go.transform, false);
+            SpriteRenderer selectionRenderer = selection.GetComponent<SpriteRenderer>();
+            selectionRenderer.enabled = false;
+            RangeIndicator selectionIndicator = selection.AddComponent<RangeIndicator>();
+            SetField(selectionIndicator, "ringSprite", selectionRenderer);
+            SetField(selectionIndicator, "material", material);
+            SetField(selectionIndicator, "sortingOrder", OrderRange);
+            SetField(selectionIndicator, "fillColor", new Color(1f, 0.84f, 0.35f, 0.14f));
+            SetField(selectionIndicator, "lineColor", new Color(1f, 0.84f, 0.35f, 0.85f));
+            SetField(selectionIndicator, "lineWidth", 0.022f);
+            SetField(placer, "selectionRange", selectionIndicator);
             SetField(placer, "messages", messages);
             SetField(placer, "gameManager", gameManager);
             return placer;
@@ -904,7 +919,11 @@ namespace TowerDefense.EditorTools
             foreach (GameObject topDownLabel in new[] { labelGo, targetingGo, waveGo, messageGo }) topDownLabel.SetActive(false);
 
             GameObject eventSystemGo = new GameObject("EventSystem");
-            eventSystemGo.AddComponent<EventSystem>();
+            EventSystem eventSystem = eventSystemGo.AddComponent<EventSystem>();
+            // No keyboard / gamepad UI navigation: its Move action uses the arrow keys, which would
+            // move the focus between buttons or change a focused slider instead of the tower's strategy.
+            // Every UI element is used with the mouse; nothing relied on navigation, Submit or Cancel.
+            eventSystem.sendNavigationEvents = false;
             eventSystemGo.AddComponent<InputSystemUIInputModule>();
             return messages;
         }
@@ -1786,6 +1805,70 @@ namespace TowerDefense.EditorTools
             SetField(view, "highlight", highlight);
             card.gameObject.SetActive(false); // Shown by TowerSelector for the towers a level allows.
             return view;
+        }
+
+        private static readonly Color SelectionRangeColor = new Color(1f, 0.84f, 0.35f, 0.8f);
+        private static readonly Color StrategyActiveText = new Color(0.12f, 0.10f, 0.08f);
+
+        // The card of the selected placed tower, used in both views (TowerInfoCard places it):
+        // name, FIXED tag, "TARGET: FIRST" with < > buttons, and the four strategy buttons (2 x 2).
+        private static void BuildTowerInfoCard(Transform canvas, GridManager grid, TowerPlacer placer, GameManager gameManager,
+            MessageDisplay messages, SkinSet skin)
+        {
+            RectTransform root = UiRect("TowerInfo", canvas);
+            StretchFull(root);
+            root.SetAsFirstSibling(); // Under the Game Over overlay, the level select and the audio panel.
+
+            RectTransform card = UiPanel("TowerInfoCard", root, skin, new Vector2(1f, 0f), new Vector2(-20f, 16f), new Vector2(380f, 214f));
+            card.GetComponent<Image>().raycastTarget = true; // Clicks on the card never reach the board.
+
+            TextMeshProUGUI nameLabel = UiText("Name", card, "Basic Tower", 24, HudTextColor, TextAlignmentOptions.Left, Vector2.zero, Vector2.zero);
+            SetRect(nameLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(18f, -28f), new Vector2(240f, 36f));
+            TextMeshProUGUI fixedTag = UiText("Fixed", card, "FIXED", 20, HudGoldColor, TextAlignmentOptions.Right, Vector2.zero, Vector2.zero);
+            SetRect(fixedTag.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-18f, -28f), new Vector2(96f, 36f));
+
+            TextMeshProUGUI target = UiText("Target", card, "TARGET: FIRST", 20, HudTextColor, TextAlignmentOptions.Left, Vector2.zero, Vector2.zero);
+            SetRect(target.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(18f, -78f), new Vector2(250f, 44f));
+            Button previous = UiArrowButton("Previous", card, skin, new Vector2(1f, 1f), Vector2.zero, false);
+            SetRect((RectTransform)previous.transform, new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-62f, -78f), new Vector2(44f, 44f));
+            previous.navigation = new Navigation { mode = Navigation.Mode.None };
+            Button next = UiArrowButton("Next", card, skin, new Vector2(1f, 1f), Vector2.zero, true);
+            SetRect((RectTransform)next.transform, new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-14f, -78f), new Vector2(44f, 44f));
+            next.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            Object[] modes = new Object[TargetingSettings.Count];
+            for (int i = 0; i < modes.Length; i++)
+            {
+                string label = TargetingSettings.At(i).ToString();
+                Image image = UiImage(label + "Button", card, skin.hudButton, HudArrowButtonColor, true);
+                image.raycastTarget = true;
+                SetRect(image.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 0.5f),
+                    new Vector2(i % 2 == 0 ? 14f : 198f, i < 2 ? -132f : -184f), new Vector2(168f, 46f));
+                Button button = image.gameObject.AddComponent<Button>();
+                button.targetGraphic = image;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+                UiText("Label", image.rectTransform, label, 18, HudTextColor, TextAlignmentOptions.Center, Vector2.zero, new Vector2(150f, 30f), centered: true);
+                modes[i] = button;
+            }
+            card.gameObject.SetActive(false); // Shown by TowerInfoCard while a tower is selected.
+
+            TowerInfoCard script = root.gameObject.AddComponent<TowerInfoCard>();
+            SetField(script, "grid", grid);
+            SetField(script, "placer", placer);
+            SetField(script, "gameManager", gameManager);
+            SetField(script, "messages", messages);
+            SetField(script, "audioPanel", canvas.GetComponentInChildren<AudioSettingsPanel>(true));
+            SetField(script, "card", card);
+            SetField(script, "nameLabel", nameLabel);
+            SetField(script, "fixedTag", fixedTag.gameObject);
+            SetField(script, "targetLabel", target);
+            SetField(script, "previousButton", previous);
+            SetField(script, "nextButton", next);
+            SetArray(script, "modeButtons", modes);
+            SetField(script, "activeButton", HudGoldColor);
+            SetField(script, "idleButton", HudArrowButtonColor);
+            SetField(script, "activeText", StrategyActiveText);
+            SetField(script, "idleText", HudTextColor);
         }
 
         private static RectTransform UiRect(string name, Transform parent)

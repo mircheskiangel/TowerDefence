@@ -52,7 +52,10 @@ so references stay valid). All balance numbers are set in `LevelBuilder.cs`.
 | Input | Action |
 |---|---|
 | **1** / **2**, or click a tower card | Select the tower to build: 1 = Basic Tower, 2 = Siege Cannon (where the level offers it) |
-| **Left mouse click** on a free cell | Place the selected tower (green highlight = allowed, red = not allowed). On a fixed Siege Cannon it shows "This tower is fixed" |
+| **Left mouse click** on a free cell | Place the selected tower (green highlight = allowed, red = not allowed) |
+| **Left mouse click** on a placed tower (bought or fixed) | Select it: its range stays shown (gold) and the tower card (bottom right) shows its targeting strategy. A click on any other cell, or outside the board, clears the selection |
+| **← / →** (arrow keys) | Previous / next targeting strategy of the **selected** tower (First → Closest → Strongest → Weakest, wrapping). Without a selection: "Select a tower first" |
+| **Shift + ← / →** | The same for **every tower of the selected tower's type** (e.g. "All Siege Cannons: Strongest") |
 | Hover over a cell where a tower can be placed, or over an existing tower | Shows the tower's range circle |
 | **P** | Show / hide the debug line of the current A\* path from spawn to goal |
 | **O** | Show / hide the cells the last spawn-to-goal A\* search expanded, with the expanded count and path length in the message panel |
@@ -60,7 +63,7 @@ so references stay valid). All balance numbers are set in `LevelBuilder.cs`.
 | **M** | Mute / unmute all sound (works everywhere) |
 | **Speaker button** (top right) | Opens the audio panel: Master, Music and Sfx volume and Mute |
 | **K** | Switch the enemy skin in the isometric view: characters (default) ↔ balls. Visual only; affects live and future enemies |
-| **T** | Cycle the targeting mode of **all** towers: First → Closest → Strongest → Weakest |
+| **T** | Cycle the global targeting mode: **all** towers and every new tower get it (First → Closest → Strongest → Weakest) |
 | **◀ / ▶** buttons (isometric HUD, top right) | Previous / next targeting mode |
 | **Space** | Skip the countdown before the next wave |
 | **R** (only while the end panel is shown) | Restart the level |
@@ -215,7 +218,7 @@ the margin left of the board. On Levels 1-3 there is one card, without name or c
 cells permanent, and `TowerPlacer` creates the towers at level start. Like a wall, a fixed tower blocks
 A\*, is untouched by the placement simulation and its restore step, counts as an obstacle in "Path
 blocked!", and is never drawn on by the road or the O overlay. It cannot be sold, replaced or upgraded, and
-it uses the current targeting mode. Clicking one shows "This tower is fixed", and hovering shows its range
+its targeting strategy can be changed like any tower's. Clicking one selects it (the card shows FIXED), and hovering shows its range
 ellipse (0.71 r × 0.35 r on screen, as for every tower).
 
 **Siege Cannon art.** The slots `SiegeBody` (fixed), `SiegeBodyPlain` (bought: the same without the gold plate), `SiegeShadow` and `SiegeProjectile` hold a wider stone plinth,
@@ -268,7 +271,7 @@ All runtime code is in `Assets/Scripts/` under the namespace `TowerDefense`.
 | `Towers` | `Tower` (scan, fire), `TowerPlacer` (mouse placement + path-blocked check, hover highlight), `Projectile`, `RangeIndicator` (range circle / ellipse), `PuffEffect` (placement puff) |
 | `Towers/Targeting` | `TargetingMode`, `ITargetSelector`, `TargetSelectors` (the four strategies), `TargetingSettings` (global mode), `TargetingModeSwitcher` (T key) |
 | `Waves` | `WaveManager` (countdowns, spawning coroutine, wave-cleared check) |
-| `UI` | `ResourcesHUD`, `TargetingHUD`, `WaveHUD`, `MessageDisplay`, `GameOverPanel`, `LevelSelectPanel`, `IsoHud` (isometric panels) |
+| `UI` | `ResourcesHUD`, `TargetingHUD`, `WaveHUD`, `MessageDisplay`, `GameOverPanel`, `LevelSelectPanel`, `IsoHud` (isometric panels), `TowerInfoCard` (selected tower card and arrow keys) |
 | `Audio` | `AudioManager` (persistent sound player, music state machine, settings), `AudioLibrary` (generated clip table), `AudioSettingsPanel` (speaker button and panel), `SfxId` / `MusicId` / `JingleId` |
 | `Skins` | `SkinSet` (sprite slots), `SkinSlot`, `SkinnedSprite` (one renderer or image taking its sprite from a slot) |
 | `Data` | ScriptableObjects: `LevelData`, `EnemySO`, `TowerSO`, `WaveSO` |
@@ -283,7 +286,8 @@ The systems talk to each other mostly through **C# events**, so no class needs t
 - `PlayerResources.LivesDepleted` → `GameManager` switches to **Lost**, `WaveManager` stops spawning.
 - `WaveManager.AllWavesCleared` → `GameManager` switches to **Won**.
 - `GameManager.StateChanged` → `GameOverPanel` shows the end screen.
-- `TargetingSettings.ModeChanged` → every `Tower` re-scans at once, `TargetingHUD` redraws.
+- `TargetingSettings.ModeChanged` → every `Tower` calls `SetStrategy` (and picks its target at once), `TargetingHUD` redraws.
+- `TowerPlacer.PlacedSelectionChanged` and `Tower.StrategyChanged` → `TowerInfoCard` shows the selected tower's card.
 - `GridManager.ProjectionChanged` → floor, markers, camera, sprites, draw orders, range indicator,
   hover highlight and path line all redraw for the new view.
 
@@ -484,6 +488,106 @@ starts the right music. Music fades follow real time, so game speed never change
 (top right on the level select, under the targeting selector in a level) opens the panel in both views; the sfx
 slider plays a click on release. **M** mutes everywhere. The camera holds the only AudioListener.
 
+## Targeting strategies and keys
+
+Each tower picks its target with one of four strategies (the Strategy pattern, see
+[d) Target selection](#d-target-selection-strategy-pattern)): **First** (furthest along the path), **Closest**,
+**Strongest** (most health) and **Weakest** (least health).
+
+**Choosing a strategy for one tower.** Click a placed tower, bought or fixed, to select it. Its range stays
+shown in gold and a card appears in the bottom right corner (isometric HUD style; smaller, in the margin right
+of the board, in top-down): the tower's name, FIXED for a level's own Siege Cannon, `TARGET: STRONGEST` with
+`<` `>` buttons, and one button per strategy with the active one highlighted in gold.
+
+| Input | Effect |
+|---|---|
+| **→** / **←** | Next / previous strategy of the selected tower: First → Closest → Strongest → Weakest → First |
+| **Shift + →** / **Shift + ←** | The same, for every tower of the selected tower's type (bought and fixed) |
+| `<` / `>` on the card | Same as ← / → (with Shift held: the whole type) |
+| A strategy button on the card | That strategy (with Shift held: the whole type) |
+| Click on another cell / outside the board | Clears the selection (a click on a free cell still builds as before) |
+
+Each change shows one short message ("Basic Tower: Strongest", "All Siege Cannons: Strongest"); a new message
+replaces the previous one. A key gives one change per press, also when it is held down. Without a selection the
+keys show "Select a tower first". The keys do nothing on the level select, after a win or a loss, and while the
+audio panel is open. Keys play the UI click (`AudioManager`), like the card's buttons.
+
+**One order, one method.** The order of the strategies is defined once, in `TargetingSettings`
+(`Next` / `Previous` / `Step`), and used by T, the HUD arrows, the arrow keys and the card. Every change ends
+in `Tower.SetStrategy`, which the global mode (T, HUD arrows) also calls for every tower. It switches the
+selector and picks the new target **at once**; the fire cooldown and the 0.1 s scan rhythm are not touched,
+so a change never makes a tower fire sooner or later. New towers start with the global mode (First by
+default). A restart or a level change rebuilds the scene: every tower starts with First again and nothing is
+selected (`TargetingSettings` is reset by `GameManager`, no other static state was added).
+
+**Keys already in use** (none of them changed): 1 / 2 (tower to build), T (global targeting mode), V (view),
+K (enemy skin), P (path line), O (A\* overlay), M (mute), Space (skip the countdown), R (restart, only on the end
+panel). Esc is not used. The arrow keys were only used by the EventSystem's UI navigation (its Move action).
+That navigation would move the focus between buttons, or change a focused audio slider, so it is now
+**switched off** (`EventSystem.sendNavigationEvents = false`, set by Build Level). Every UI element is used with
+the mouse; nothing relied on keyboard navigation, Submit or Cancel.
+
+**Verification.**
+
+- **Scripted key test (48 checks, 0 failed, 0 errors).** Real key presses are sent through the Input System
+  (`InputSystem.QueueStateEvent`). Four enemies stand around the tower so that every strategy picks a
+  different one; the expected target is computed by the test itself (not by the selector classes).
+
+  Basic Tower at (8,2), Level 1 (range 2.5): Grunt A at (9,4), 76 hp, 6 cells left to the goal;
+  Grunt B at (8,1), 60 hp, distance 1; Tank C at (7,0), 400 hp; Grunt D at (6,3), 10 hp.
+
+  | Step | Key | Strategy | Card | Expected target | Actual target |
+  |---|---|---|---|---|---|
+  | 0 | (start) | First | TARGET: FIRST | Grunt A | Grunt A |
+  | 1 | → | Closest | TARGET: CLOSEST | Grunt B | Grunt B |
+  | 2 | → | Strongest | TARGET: STRONGEST | Tank C | Tank C |
+  | 3 | → | Weakest | TARGET: WEAKEST | Grunt D | Grunt D |
+  | 4 | → (wraps) | First | TARGET: FIRST | Grunt A | Grunt A |
+  | 5 | ← (wraps) | Weakest | TARGET: WEAKEST | Grunt D | Grunt D |
+  | 6 | ← | Strongest | TARGET: STRONGEST | Tank C | Tank C |
+  | 7 | ← | Closest | TARGET: CLOSEST | Grunt B | Grunt B |
+  | 8 | ← | First | TARGET: FIRST | Grunt A | Grunt A |
+
+  The same table for the **fixed Siege Cannon** at (4,7) on Level 3 (range 4.5; Grunt at (8,5) 8 cells from
+  the goal, Grunt at (4,6) distance 1, Tank at (0,7), Grunt at (4,4) with 10 hp) gives the expected target at
+  all 9 steps too. Each step shows exactly one message ("Basic Tower: Closest", "Siege Cannon: Weakest", ...)
+  and highlights the right button.
+- **Shift + arrow** on Level 4 (fixed Siege Cannon selected): Shift+→ sets both fixed and the bought Siege
+  Cannon to Closest, the Basic Tower stays First, one message "All Siege Cannons: Closest"; Shift+← twice
+  wraps to Weakest. Selecting the Basic Tower then shows its own FIRST; a plain → changes only that tower.
+- **Other checks:** no selection gives "Select a tower first" and changes nothing; a key held for 40 frames
+  gives one change and one message; the card's strategy, `<` and `>` buttons work; the keys are ignored on the
+  level select and while the audio panel is open (volumes unchanged); a click on a non-tower cell deselects;
+  T still sets every tower; destroying the selected tower clears the selection with no errors; a restart and a
+  level change start with First everywhere and nothing selected.
+- **Keys during a running wave:** 66 presses in 14 s (every 5th with Shift) while 5 towers fired 42 shots: no
+  errors, and no tower fired sooner than its cooldown (smallest gap between two shots of one tower:
+  1.002 × cooldown).
+- **BalanceBot** (reasonable, 6 runs per level, isometric, 4x). The bot only places towers through
+  `TryPlaceTower` and never changes a strategy, so it runs exactly the same code as before. Its results are
+  not exactly repeatable (it runs on real frame times at 4x), so M14 was run again in the same session:
+
+  | Level | M14 (first run) | M14 (same session) | M15 |
+  |---|---|---|---|
+  | 1 | won 6/6, 5.50 lives | won 6/6, 5.00 lives | won 6/6, 4.67 lives |
+  | 2 | won 6/6, 3.83 lives | won 6/6, 3.50 lives | won 6/6, 3.67 lives |
+  | 3 | won 6/6, 3.00 lives | won 6/6, 3.00 lives | won 6/6, 3.00 lives |
+  | 4 | won 6/6, 3.50 lives | won 6/6, 3.50 lives | won 6/6, 3.17 lives |
+  | 5 | won 6/12 | won 4/6 | won 2/6 (every loss: the Colossus leaked with 50-100 of 4600 hp left) |
+
+  The M15 numbers lie within the spread of M14 against itself; Level 5 is a coin flip by design.
+- **Runtime dumps** (every sprite and UI element, menu and Levels 1-5): the only differences to M14 are the
+  17 new objects (the hidden `SelectionRange` and the 16 parts of the hidden card), plus the spawn portal glow,
+  whose alpha pulses with time.
+- **Frame time**, Level 5 with 20 Basic Towers and a running wave, 900 frames each: M14 15.51 / 12.95 /
+  15.45 ms; M15 with a selected tower and its card shown 15.82 / 15.77 ms, with nothing selected
+  15.05 / 16.47 ms. **0 B of garbage per frame** from the game's scripts (measured from the start of Update
+  to the end of LateUpdate), and 0 B per call of `TowerInfoCard.Update` (the key handling).
+- **Layout:** the card fits at 1280x720, 1920x1080 and 1024x768 in both views: 16 (isometric) / 8 (top-down)
+  units from the screen edge, every text at least 12.9 units inside its box (7.8 in top-down's smaller card),
+  at least 20 units between "TARGET: STRONGEST" and the `<` button (12 in top-down), no overlap with any other
+  UI element, and in top-down it stays clear of the board.
+
 ## AI techniques used
 
 ### a) A\* pathfinding
@@ -579,8 +683,9 @@ the full check again.
   with every enemy, and doing it ten times per second instead of every frame saves most of that
   work without a visible delay. Each tower starts with a **random first delay** so that many towers do
   not all scan in the same frame. The in-range list is reused, so scanning creates no garbage.
-- The mode is **global** (`TargetingSettings`); pressing T changes it for all towers, including towers
-  placed later, and they re-scan immediately.
+- **Every tower has its own strategy** (`Tower.Strategy`), chosen with the arrow keys or the tower card
+  (see [Targeting strategies and keys](#targeting-strategies-and-keys)). A new tower starts with the global
+  mode (`TargetingSettings.Mode`, First by default); T or the HUD arrows set the global mode and every tower.
 
 ### e) Safe handling of moving targets
 
@@ -771,4 +876,3 @@ be held: 250 gold buys about 5 cannons against 6,000 HP of Tanks in wave 1.
   scales better with many enemies.
 - **Tower upgrades** (more damage, range or fire rate for gold).
 - **Flying enemies** that ignore the grid and fly straight to the goal, so mazes do not work against them.
-- **Per-tower targeting modes** instead of one global mode.

@@ -107,8 +107,7 @@ namespace TowerDefense
 
         private static void PreviousMode()
         {
-            int count = System.Enum.GetValues(typeof(TargetingMode)).Length;
-            TargetingSettings.SetMode((TargetingMode)(((int)TargetingSettings.Mode + count - 1) % count));
+            TargetingSettings.SetMode(TargetingSettings.Previous(TargetingSettings.Mode));
         }
 
         private static void NextMode()

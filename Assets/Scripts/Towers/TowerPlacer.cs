@@ -10,6 +10,8 @@ namespace TowerDefense
     // the cursor, tints a highlight green (valid) or red (invalid) and shows the range circle.
     // Before a tower is placed, the placement is SIMULATED with A*: if it would cut off the
     // route from spawn to goal, or trap an enemy already walking, it is rejected ("Path blocked!").
+    // A click on a placed tower (bought or fixed) SELECTS it: its range stays shown and the tower
+    // card shows its strategy. A click anywhere else on the board clears the selection first.
     public class TowerPlacer : MonoBehaviour
     {
         [SerializeField] private GridManager grid;
@@ -30,6 +32,8 @@ namespace TowerDefense
         [SerializeField] private Sprite diamondHighlight;
         [SerializeField] private SpriteRenderer rangeCircle;
         [SerializeField] private RangeIndicator rangeIndicator;
+        [Tooltip("The range of the selected placed tower (stays shown while the cursor moves).")]
+        [SerializeField] private RangeIndicator selectionRange;
         [SerializeField] private MessageDisplay messages;
         [SerializeField] private GameManager gameManager;
         [SerializeField] private Color validColor = new Color(0.2f, 1f, 0.3f, 0.45f);
@@ -51,6 +55,12 @@ namespace TowerDefense
         public event Action TowersChanged;
         // A click or placement that could not build (any reason, with or without a message). Audio listens.
         public event Action PlacementRejected;
+        // The selected placed tower changed (the tower card listens). Null = nothing selected.
+        public event Action<Tower> PlacedSelectionChanged;
+
+        // The placed tower the player clicked, or null. Unity's == makes a destroyed tower null.
+        public Tower SelectedPlaced => selectedPlaced != null ? selectedPlaced : null;
+        private Tower selectedPlaced;
 
         private void Reject(string message)
         {
@@ -143,6 +153,44 @@ namespace TowerDefense
             HideRange();
             grid.GridChanged += InvalidateHoverCache;
             grid.ProjectionChanged += ApplyHighlightShape;
+            if (gameManager != null) gameManager.StateChanged += ClearSelectionOnEnd;
+        }
+
+        private void ClearSelectionOnEnd(GameState state)
+        {
+            if (state != GameState.Playing) SelectPlaced(null);
+        }
+
+        // Selects a placed tower (null clears the selection) and shows its range. Public so the
+        // keys and the card can be tested without a real mouse.
+        public void SelectPlaced(Tower tower)
+        {
+            if (tower != null && tower.Data == null) tower = null;
+            if (ReferenceEquals(tower, selectedPlaced)) return;
+            selectedPlaced = tower;
+            ShowSelectionRange();
+            PlacedSelectionChanged?.Invoke(SelectedPlaced);
+        }
+
+        private void ShowSelectionRange()
+        {
+            if (selectionRange == null) return;
+            if (SelectedPlaced == null) selectionRange.Hide();
+            else selectionRange.Show(grid, SelectedPlaced.Cell, SelectedPlaced.Data.range);
+        }
+
+        // Shift + arrow: every placed tower of this type (bought and fixed) gets the strategy.
+        // Returns how many towers there are of that type.
+        public int SetStrategyForType(TowerSO type, TargetingMode mode)
+        {
+            int count = 0;
+            foreach (Tower placed in towers.Values)
+            {
+                if (placed == null || placed.Data != type) continue;
+                placed.SetStrategy(mode);
+                count++;
+            }
+            return count;
         }
 
         private void OnDestroy()
@@ -150,12 +198,18 @@ namespace TowerDefense
             if (grid == null) return;
             grid.GridChanged -= InvalidateHoverCache;
             grid.ProjectionChanged -= ApplyHighlightShape;
+            if (gameManager != null) gameManager.StateChanged -= ClearSelectionOnEnd;
         }
 
         // Visual only: a square highlight in top-down, a diamond in isometric, sized to one cell.
         private void ApplyHighlightShape()
         {
             if (rangeIndicator != null) rangeIndicator.Invalidate();
+            if (selectionRange != null)
+            {
+                selectionRange.Invalidate();
+                ShowSelectionRange();
+            }
             Sprite sprite = grid.ProjectionType == GridProjectionType.Isometric ? diamondHighlight : squareHighlight;
             if (sprite != null) highlight.sprite = sprite;
             Vector2 footprint = grid.CellFootprint;
@@ -173,8 +227,13 @@ namespace TowerDefense
         {
             Mouse mouse = Mouse.current;
             bool playing = gameManager == null || gameManager.IsPlaying; // No building after Won/Lost.
+            // A selected tower that no longer exists is dropped (no stale reference).
+            if (!ReferenceEquals(selectedPlaced, null) && selectedPlaced == null) SelectPlaced(null);
             if (!playing || mouse == null || IsPointerOverUI() || !TryGetHoveredCell(mouse, out Vector2Int cell))
             {
+                // A click on the board outside the grid clears the selection.
+                if (playing && mouse != null && mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI())
+                    SelectPlaced(null);
                 HideHover();
                 return;
             }
@@ -208,18 +267,24 @@ namespace TowerDefense
             if (mouse.leftButton.wasPressedThisFrame) ClickCell(cell);
         }
 
-        // A click on a grid cell. A free, affordable cell always runs the full check again
-        // (TryPlaceTower), because enemies may have moved since the hover result was cached.
-        // A wall or a tower only gives a message; nothing is ever replaced. Public so the rules
-        // can be tested without a real mouse.
+        // A click on a grid cell. A click on a placed tower selects it. Any other click clears the
+        // selection, then: a free, affordable cell always runs the full check again (TryPlaceTower),
+        // because enemies may have moved since the hover result was cached; a wall only gives a
+        // message; nothing is ever replaced. Public so the rules can be tested without a real mouse.
         public void ClickCell(Vector2Int cell)
         {
+            if (towers.TryGetValue(cell, out Tower clicked) && clicked != null)
+            {
+                if (clicked != SelectedPlaced) AudioManager.Play(SfxId.UiClick);
+                SelectPlaced(clicked);
+                return;
+            }
+            SelectPlaced(null);
+
             if (IsFreeCell(cell) && IsLimitReached(towerData))
                 ShowLimitMessage();
             else if (IsFreeCell(cell) && resources.CanAfford(towerData.cost))
                 TryPlaceTower(cell);
-            else if (towers.TryGetValue(cell, out Tower tower) && tower != null && tower.IsFixed)
-                Reject("This tower is fixed");
             else if (grid.IsPermanent(cell))
                 Reject("Cannot build on a wall");
             else if (grid.IsBlocked(cell))

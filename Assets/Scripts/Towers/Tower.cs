@@ -4,7 +4,9 @@ using UnityEngine;
 namespace TowerDefense
 {
     // A placed tower. Every scanInterval seconds it collects the enemies within its range
-    // and asks the selector for the current global TargetingMode which one to target.
+    // and asks the selector for its own strategy (Strategy) which one to target. A tower starts
+    // with the global TargetingSettings.Mode and follows it when it changes (T, HUD arrows);
+    // SetStrategy gives it its own (arrow keys, the tower card).
     // It fires a projectile at that target whenever its cooldown (1 / fireRate) is over.
     // Range checks use grid coordinates (the tower's Cell vs. Enemy.GridPosition), never world distances.
     // One prefab for every type: stats and look come from TowerSO. A fixed tower only differs by what
@@ -43,6 +45,10 @@ namespace TowerDefense
         private GridManager grid;
 
         public TowerSO Data { get; private set; }
+        // This tower's targeting strategy (the Strategy pattern: TargetSelectors.Get(Strategy)).
+        public TargetingMode Strategy { get; private set; } = TargetingMode.First;
+        // Raised when this tower's strategy changes (the tower card listens).
+        public event System.Action<Tower> StrategyChanged;
         public Vector2Int Cell { get; private set; }
         public bool IsFixed { get; private set; }
 
@@ -55,6 +61,7 @@ namespace TowerDefense
             Data = data;
             Cell = cell;
             IsFixed = isFixed;
+            Strategy = TargetingSettings.Mode; // New towers start with the default (global) strategy.
             grid = gridManager != null ? gridManager : GridManager.Instance;
             if (grid != null) grid.ProjectionChanged += SnapViewToGrid;
             name = $"{data.displayName} ({cell.x},{cell.y})";
@@ -111,9 +118,21 @@ namespace TowerDefense
             if (depth != null) depth.Initialize(grid, Cell);
         }
 
+        // T or the HUD arrows changed the global mode: every tower follows it.
         private void OnModeChanged(TargetingMode mode)
         {
-            scanTimer = 0f; // Re-target immediately when the player presses T.
+            SetStrategy(mode);
+        }
+
+        // The one method that changes a tower's strategy (global mode, arrow keys, tower card).
+        // The new strategy picks the target at once; the fire cooldown and the scan rhythm are
+        // left untouched, so a change never makes a tower fire sooner or later.
+        public void SetStrategy(TargetingMode mode)
+        {
+            if (Strategy == mode) return;
+            Strategy = mode;
+            ScanForTarget();
+            StrategyChanged?.Invoke(this);
         }
 
         private void Update()
@@ -179,7 +198,7 @@ namespace TowerDefense
                     inRange.Add(enemy);
             }
 
-            currentTarget = TargetSelectors.Get(TargetingSettings.Mode).SelectTarget(position, inRange);
+            currentTarget = TargetSelectors.Get(Strategy).SelectTarget(position, inRange);
         }
     }
 }
